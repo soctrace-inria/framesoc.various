@@ -7,7 +7,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 
-import org.eclipse.core.runtime.Assert;
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -18,14 +17,11 @@ import fr.inria.soctrace.lib.model.EventParamType;
 import fr.inria.soctrace.lib.model.EventProducer;
 import fr.inria.soctrace.lib.model.EventType;
 import fr.inria.soctrace.lib.model.File;
-import fr.inria.soctrace.lib.model.Link;
-import fr.inria.soctrace.lib.model.PunctualEvent;
 import fr.inria.soctrace.lib.model.State;
 import fr.inria.soctrace.lib.model.Trace;
 import fr.inria.soctrace.lib.model.TraceParam;
 import fr.inria.soctrace.lib.model.TraceParamType;
 import fr.inria.soctrace.lib.model.TraceType;
-import fr.inria.soctrace.lib.model.Variable;
 import fr.inria.soctrace.lib.model.utils.ModelConstants.EventCategory;
 import fr.inria.soctrace.lib.model.utils.ModelConstants.TimeUnit;
 import fr.inria.soctrace.lib.model.utils.SoCTraceException;
@@ -376,54 +372,27 @@ public class TraceGenerator {
 			IdManager eIdManager, IdManager epIdManager,
 			IProgressMonitor monitor) throws SoCTraceException {
 		int i;
+		 ;
 		Random rand = new Random();
 		for (EventProducer eProd : leaves) {
-			currentTimestamp = 0;
+			currentTimestamp = 0l;
 			for (i = 0; i < numberOfEvents / leaves.size(); i++) {
 				// Randomize event type
 				int type = rand.nextInt(typesList.size());
 				EventType et = typesList.get(type);
 				Event e = null;
 
-				switch (et.getCategory()) {
-				case EventCategory.PUNCTUAL_EVENT:
-					e = new PunctualEvent(eIdManager.getNextId());
-					e.setTimestamp(currentTimestamp);
-					currentTimestamp++;
-					break;
-				case EventCategory.STATE:
-					State s = new State(eIdManager.getNextId());
-					s.setTimestamp(currentTimestamp);
+				State s = new State(eIdManager.getNextId());
+				s.setTimestamp(currentTimestamp);
 
-					// Randomize state duration
-					long duration = (rand.nextLong()/maxStateTime) + 1;
-					s.setEndTimestamp(currentTimestamp + duration);
-					s.setImbricationLevel(0);
-					currentTimestamp = currentTimestamp + duration;
-					e = s;
-					break;
-				case EventCategory.LINK:
-					Link l = new Link(eIdManager.getNextId());
-					l.setTimestamp(currentTimestamp);
-					l.setEndTimestamp(currentTimestamp + MAX_DURATION);
-					if (onlyLeaveProducer) {// XXX
-						l.setEndProducer(leaves.get(i % leaves.size()));
-					} else {
-						l.setEndProducer(producers.get(i % producers.size()));
-					}
-					currentTimestamp = currentTimestamp + MAX_DURATION + 1;
-					e = l;
-					break;
-				case EventCategory.VARIABLE:
-					Variable v = new Variable(eIdManager.getNextId());
-					v.setTimestamp(currentTimestamp);
-					v.setEndTimestamp(0); // XXX
-					currentTimestamp++; // XXX
-					e = v;
-					break;
-				}
+				// Randomize state duration
+				long duration = (Math.abs(rand.nextLong()) / (numberOfEvents + 1l)) + 1l;
+				
+				s.setEndTimestamp(currentTimestamp + duration);
+				s.setImbricationLevel(0);
+				currentTimestamp = currentTimestamp + duration;
 
-				Assert.isNotNull(e, "Null event: wrong category");
+				e = s;
 
 				e.setCategory(et.getCategory());
 				e.setType(et);
@@ -440,15 +409,19 @@ public class TraceGenerator {
 				}
 
 				traceDB.save(e);
+
 				if (i % Temictli.NumberOfEventInCommit == 0) {
 					if (monitor.isCanceled()) {
 						return;
 					}
-
 					traceDB.commit();
-					monitor.worked(1);
 				}
 			}
+			if (monitor.isCanceled()) {
+				return;
+			}
+			traceDB.commit();
+			monitor.worked(1);
 		}
 	}
 

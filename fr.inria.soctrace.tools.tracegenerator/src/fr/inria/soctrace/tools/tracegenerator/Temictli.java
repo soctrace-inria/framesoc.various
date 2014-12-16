@@ -65,7 +65,7 @@ public class Temictli extends FramesocTool {
 	public void generateTraces(IProgressMonitor monitor) {
 		int[] numberOfEvents = new int[] { 1000000, 10000000, 100000000,
 				1000000000, 2000000000, Integer.MAX_VALUE - 1};
-		
+
 		for (int aNumberOfEvents : numberOfEvents) {
 			TraceGenConfig aConfig = new TraceGenConfig();
 			aConfig.getCategories().add(EventCategory.STATE);
@@ -76,7 +76,7 @@ public class Temictli extends FramesocTool {
 			aConfig.setNumberOfEvents(aNumberOfEvents);
 
 			TraceGenerator aGenerator = new TraceGenerator();
-			int numberOfWork = (int) (aConfig.getNumberOfEvents() / NumberOfEventInCommit) + 1;
+			int numberOfWork = (int) (aConfig.getNumberOfLeaves()) + 1;
 			monitor.beginTask("Generating trace", numberOfWork);
 			aGenerator.setTraceConfig(aConfig,
 					"virtualTrace_" + aNumberOfEvents + "_" + System.currentTimeMillis());
