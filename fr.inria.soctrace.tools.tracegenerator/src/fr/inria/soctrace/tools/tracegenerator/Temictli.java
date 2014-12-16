@@ -1,14 +1,5 @@
 package fr.inria.soctrace.tools.tracegenerator;
 
-import java.io.BufferedReader;
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
-import java.util.ArrayList;
-import java.util.Iterator;
-import java.util.List;
-
 import org.eclipse.core.runtime.IProgressMonitor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,8 +20,6 @@ public class Temictli extends FramesocTool {
 			.getLogger(Temictli.class);
 
 	private String configFile;
-	private final String CatSeparator = "#";
-	private final String CSVDelimiter = ";";
 	public static final int NumberOfEventInCommit = 20000;
 
 	/**
@@ -53,37 +42,13 @@ public class Temictli extends FramesocTool {
 				logger.debug(s);
 			}
 
-			if (args.length < 1) {
-				logger.error("Too few arguments");
-				return;
-			}
-
 			/*
 			 * String sysDbName = Configuration.getInstance().get(
 			 * SoCTraceProperty.soctrace_db_name); String traceDbName =
 			 * FramesocManager.getInstance().getTraceDBName( "CTFTRACE");
 			 */
 
-			List<String> configFiles = new ArrayList<String>();
-
-			for (int i = 0; i < args.length; ++i) {
-				configFiles.add(args[i]);
-				File t = new File(args[i]);
-				if (!t.exists()) {
-					logger.error("File " + args[i] + " not found");
-					return;
-				}
-			}
-
-			int numTraceFiles = configFiles.size();
-			String[] traceFiles = new String[numTraceFiles];
-			Iterator<String> it = configFiles.iterator();
-			for (int i = 0; i < numTraceFiles; ++i) {
-				traceFiles[i] = it.next();
-			}
-
 			Temictli generator = new Temictli();
-			generator.setConfigFile(configFiles.get(0));
 			generator.generateTraces(monitor);
 			monitor.done();
 		}
@@ -98,57 +63,30 @@ public class Temictli extends FramesocTool {
 	}
 
 	public void generateTraces(IProgressMonitor monitor) {
-		File aFile = new File(configFile);
+		int[] numberOfEvents = new int[] { 1000000, 10000000, 100000000,
+				1000000000, 2000000000, Integer.MAX_VALUE - 1};
+		
+		for (int aNumberOfEvents : numberOfEvents) {
+			TraceGenConfig aConfig = new TraceGenConfig();
+			aConfig.getCategories().add(EventCategory.STATE);
+			aConfig.setNumberOfEventType(10);
+			aConfig.setNumberOfProducers(11111);
+			aConfig.setNumberOfLeaves(10000);
+			aConfig.setOnlyLeavesAsProducer(true);
+			aConfig.setNumberOfEvents(aNumberOfEvents);
 
-		try {
-			if (aFile.canRead() && aFile.isFile()) {
-				BufferedReader bufFileReader;
-				bufFileReader = new BufferedReader(new FileReader(aFile));
-				String line;
-				
-				// Read configuration
-				while ((line = bufFileReader.readLine()) != null) {
-					if (line.isEmpty())
-						continue;
+			TraceGenerator aGenerator = new TraceGenerator();
+			int numberOfWork = (int) (aConfig.getNumberOfEvents() / NumberOfEventInCommit) + 1;
+			monitor.beginTask("Generating trace", numberOfWork);
+			aGenerator.setTraceConfig(aConfig,
+					"virtualTrace_" + aNumberOfEvents + "_" + System.currentTimeMillis());
 
-					String[] header = line.split(CSVDelimiter);
-					TraceGenConfig aConfig = new TraceGenConfig();
-					String[] cats = header[0].split(CatSeparator);
-					for (String aCat : cats) {
-						aConfig.getCategories().add(stringToCategory(aCat));
-					}
-
-					aConfig.setNumberOfEventType(Integer.valueOf(header[1]));
-					aConfig.setNumberOfProducers(Integer.valueOf(header[2]));
-					aConfig.setNumberOfLeaves(Integer.valueOf(header[3]));
-					aConfig.setOnlyLeavesAsProducer(Boolean.valueOf(header[4]));
-					aConfig.setNumberOfEvents(Long.valueOf(header[5]));
-
-					if (monitor.isCanceled()) {
-						bufFileReader.close();
-						return;
-					}
-
-					TraceGenerator aGenerator = new TraceGenerator();
-					int numberOfWork = (int) (aConfig.getNumberOfEvents() / NumberOfEventInCommit) + 1;
-					monitor.beginTask("Generating trace", numberOfWork);
-					aGenerator.setTraceConfig(aConfig,
-							"virtualTrace_" + System.currentTimeMillis());
-
-					aGenerator.generateTrace(monitor);
-				}
-
-				bufFileReader.close();
+			try {
+				aGenerator.generateTrace(monitor);
+			} catch (SoCTraceException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
 			}
-		} catch (FileNotFoundException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (SoCTraceException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
 		}
 	}
 

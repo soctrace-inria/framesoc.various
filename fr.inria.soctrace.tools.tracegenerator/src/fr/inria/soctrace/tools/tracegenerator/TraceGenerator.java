@@ -186,10 +186,15 @@ public class TraceGenerator {
 
 	public HashMap<EventProducer, Double> coeffMod;
 
+	
+	List<EventProducer> producers = new ArrayList<EventProducer>();
+	List<EventProducer> leaves = new ArrayList<EventProducer>();
+	
 	/*
 	 * Short-cuts
 	 */
 	public int numberOfCategories;
+	public long maxStateTime = 1l;
 
 	// public String TRACE_TYPE_NAME = TraceGenerator.TYPE_NAME_PREFIX +
 	// TraceGenerator.TRACE_TYPE_ID;
@@ -206,8 +211,6 @@ public class TraceGenerator {
 
 	public long getNumberOfEvents(int category) {
 		return numberOfEvents;
-		// return getEventsPerCategory() * (categories.contains(category) ? 1 :
-		// 0);
 	}
 
 	public long getMaxTimestamp() {
@@ -247,14 +250,13 @@ public class TraceGenerator {
 
 		// event category, types
 		List<EventType> typesList = new ArrayList<EventType>();
-		List<EventProducer> producers = new ArrayList<EventProducer>();
-		List<EventProducer> leaves = new ArrayList<EventProducer>();
+		producers = new ArrayList<EventProducer>();
+		leaves = new ArrayList<EventProducer>();
 
 		coeffMod = new HashMap<EventProducer, Double>();
-		Random rand = new Random();
-
+		
 		monitor.subTask("Generating event types");
-		int i = 0;
+		int i = 0, j = 0, k = 0, l =0;
 		
 		// Create event types
 		for (i = 0; i < numberOfEventType; i++) {
@@ -266,45 +268,29 @@ public class TraceGenerator {
 		}
 
 		monitor.subTask("Generating event producer");
-		int rootId = -1;
+		EventProducer root = createEventProd(-1, producerIdManager, traceDB);
 		// Create non-leave producer
-		for (i = 0; i < numberOfProducers - numberOfLeaves; i++) {
-			EventProducer ep = new EventProducer(producerIdManager.getNextId());
-			ep.setName(PRODUCER_NAME_PREFIX + ep.getId());
-			ep.setType(NORMAL_PRODUCER_TYPE);
-			ep.setLocalId(PRODUCER_LOCAL_ID_PREFIX + ep.getId());
-			if (rootId == -1) {
-				ep.setParentId(EventProducer.NO_PARENT_ID);
-				rootId = ep.getId();
-			} else {
-				ep.setParentId(rootId);
+		for (i = 0; i < 10; i++) {
+			EventProducer ep1 = createEventProd(root.getId(),
+					producerIdManager, traceDB);
+			for (j = 0; j < 10; j++) {
+				EventProducer ep2 = createEventProd(ep1.getId(),
+						producerIdManager, traceDB);
+				for (k = 0; k < 10; k++) {
+					EventProducer ep3 = createEventProd(ep2.getId(),
+							producerIdManager, traceDB);
+					for (l = 0; l < 10; l++) {
+						createLeaveEventProd(ep3.getId(),
+								producerIdManager, traceDB);
+					}
+				}
 			}
-
-			coeffMod.put(ep, Math.abs(rand.nextGaussian() * 100.0));
-			producers.add(ep);
-			traceDB.save(ep);
 		}
 
-		int potentialParentsSize = producers.size();
-		// Create leave producers
-		for (i = 0; i < numberOfLeaves; i++) {
-			EventProducer ep = new EventProducer(producerIdManager.getNextId());
-			ep.setName(PRODUCER_NAME_PREFIX + ep.getId());
-			ep.setType(LEAVE_PRODUCER_TYPE);
-			ep.setLocalId(PRODUCER_LOCAL_ID_PREFIX + ep.getId());
-
-			// Randomize parent id among producers
-			int parentId = producers.get(rand.nextInt(potentialParentsSize))
-					.getId();
-			ep.setParentId(parentId);
-			coeffMod.put(ep, Math.abs(rand.nextGaussian() * 100.0));
-			producers.add(ep);
-			leaves.add(ep);
-			traceDB.save(ep);
-		}
 		traceDB.commit();
 
 		monitor.subTask("Generating events");
+		maxStateTime = Long.MAX_VALUE / numberOfEvents;
 		// Create events
 		createEvent(traceDB, typesList, producers, leaves, eIdManager,
 				epIdManager, monitor);
@@ -331,7 +317,6 @@ public class TraceGenerator {
 		SystemDBObject sysDB = SystemDBObject.openNewIstance();
 
 		TraceType tt = buildTraceType(sysDB);
-		// tt.setName(TYPE_NAME_PREFIX + tt.getId());
 		tptIdManager.setNextId(sysDB.getMaxId(
 				FramesocTable.TRACE_PARAM_TYPE.toString(), "ID") + 1);
 		for (i = 0; i < NUMBER_OF_PARAMETERS; i++) {
@@ -396,88 +381,77 @@ public class TraceGenerator {
 			IProgressMonitor monitor) throws SoCTraceException {
 		int i;
 		Random rand = new Random();
-		for (i = 0; i < numberOfEvents; i++) {
-			// Randomize event type
-			int type = rand.nextInt(typesList.size());
-			EventType et = typesList.get(type);
-			Event e = null;
-			EventProducer eProd;
-			EventProducer nodeProd = null;
-			// Dispatch uniformly the events between producers
-			if (onlyLeaveProducer) {
-				eProd = leaves.get(i % leaves.size());
-				nodeProd = producers.get(eProd.getParentId());
-			} else {
-				eProd = producers.get(i % producers.size());
-				nodeProd = eProd;
-			}
+		for (EventProducer eProd : leaves) {
+			currentTimestamp = 0;
+			for (i = 0; i < numberOfEvents / leaves.size(); i++) {
+				// Randomize event type
+				int type = rand.nextInt(typesList.size());
+				EventType et = typesList.get(type);
+				Event e = null;
 
-			switch (et.getCategory()) {
-			case EventCategory.PUNCTUAL_EVENT:
-				e = new PunctualEvent(eIdManager.getNextId());
-				e.setTimestamp(currentTimestamp);
-				currentTimestamp++;
-				break;
-			case EventCategory.STATE:
-				State s = new State(eIdManager.getNextId());
-				s.setTimestamp(currentTimestamp);
+				switch (et.getCategory()) {
+				case EventCategory.PUNCTUAL_EVENT:
+					e = new PunctualEvent(eIdManager.getNextId());
+					e.setTimestamp(currentTimestamp);
+					currentTimestamp++;
+					break;
+				case EventCategory.STATE:
+					State s = new State(eIdManager.getNextId());
+					s.setTimestamp(currentTimestamp);
 
-				// Randomize state duration
-				int duration = rand.nextInt(MAX_STATE_DURATION + 1) + 1;
-				duration = (int) (((double) duration) * coeffMod.get(nodeProd));
-				s.setEndTimestamp(currentTimestamp + duration);
-				s.setImbricationLevel(0);
-
-				// Randomize timestamp of the next events
-				int timeAdvance = rand.nextInt(MAX_ADVANCE_DURATION);
-				currentTimestamp = currentTimestamp + timeAdvance;
-				e = s;
-				break;
-			case EventCategory.LINK:
-				Link l = new Link(eIdManager.getNextId());
-				l.setTimestamp(currentTimestamp);
-				l.setEndTimestamp(currentTimestamp + MAX_DURATION);
-				if (onlyLeaveProducer) {// XXX
-					l.setEndProducer(leaves.get(i % leaves.size()));
-				} else {
-					l.setEndProducer(producers.get(i % producers.size()));
-				}
-				currentTimestamp = currentTimestamp + MAX_DURATION + 1;
-				e = l;
-				break;
-			case EventCategory.VARIABLE:
-				Variable v = new Variable(eIdManager.getNextId());
-				v.setTimestamp(currentTimestamp);
-				v.setEndTimestamp(0); // XXX
-				currentTimestamp++; // XXX
-				e = v;
-				break;
-			}
-
-			Assert.isNotNull(e, "Null event: wrong category");
-
-			e.setCategory(et.getCategory());
-			e.setType(et);
-			e.setEventProducer(eProd);
-			e.setCpu(CPU);
-			e.setPage(PAGE);
-
-			for (EventParamType ept : et.getEventParamTypes()) {
-				EventParam ep = new EventParam(epIdManager.getNextId());
-				ep.setEvent(e);
-				ep.setEventParamType(ept);
-				ep.setValue(PARAMETER_VALUE);
-				traceDB.save(ep);
-			}
-
-			traceDB.save(e);
-			if (i % Temictli.NumberOfEventInCommit == 0) {
-				if (monitor.isCanceled()) {
-					return;
+					// Randomize state duration
+					int duration = rand.nextInt((int) (maxStateTime + 1)) + 1;
+					s.setEndTimestamp(currentTimestamp + duration);
+					s.setImbricationLevel(0);
+					currentTimestamp = currentTimestamp + duration;
+					e = s;
+					break;
+				case EventCategory.LINK:
+					Link l = new Link(eIdManager.getNextId());
+					l.setTimestamp(currentTimestamp);
+					l.setEndTimestamp(currentTimestamp + MAX_DURATION);
+					if (onlyLeaveProducer) {// XXX
+						l.setEndProducer(leaves.get(i % leaves.size()));
+					} else {
+						l.setEndProducer(producers.get(i % producers.size()));
+					}
+					currentTimestamp = currentTimestamp + MAX_DURATION + 1;
+					e = l;
+					break;
+				case EventCategory.VARIABLE:
+					Variable v = new Variable(eIdManager.getNextId());
+					v.setTimestamp(currentTimestamp);
+					v.setEndTimestamp(0); // XXX
+					currentTimestamp++; // XXX
+					e = v;
+					break;
 				}
 
-				traceDB.commit();
-				monitor.worked(1);
+				Assert.isNotNull(e, "Null event: wrong category");
+
+				e.setCategory(et.getCategory());
+				e.setType(et);
+				e.setEventProducer(eProd);
+				e.setCpu(CPU);
+				e.setPage(PAGE);
+
+				for (EventParamType ept : et.getEventParamTypes()) {
+					EventParam ep = new EventParam(epIdManager.getNextId());
+					ep.setEvent(e);
+					ep.setEventParamType(ept);
+					ep.setValue(PARAMETER_VALUE);
+					traceDB.save(ep);
+				}
+
+				traceDB.save(e);
+				if (i % Temictli.NumberOfEventInCommit == 0) {
+					if (monitor.isCanceled()) {
+						return;
+					}
+
+					traceDB.commit();
+					monitor.worked(1);
+				}
 			}
 		}
 	}
@@ -507,6 +481,33 @@ public class TraceGenerator {
 		onlyLeaveProducer = aConfig.isOnlyLeavesAsProducer();
 		numberOfCategories = categories.size();
 		dbName = aName;
+	}
+
+	public EventProducer createEventProd(int parentId, IdManager producerIdManager,
+			TraceDBObject traceDB) throws SoCTraceException {
+		EventProducer ep = new EventProducer(producerIdManager.getNextId());
+		ep.setName(PRODUCER_NAME_PREFIX + ep.getId());
+		ep.setType(NORMAL_PRODUCER_TYPE);
+		ep.setLocalId(PRODUCER_LOCAL_ID_PREFIX + ep.getId());
+		ep.setParentId(parentId);
+		producers.add(ep);
+		traceDB.save(ep);
+		
+		return ep;
+	}
+
+	public EventProducer createLeaveEventProd(int parentId, IdManager producerIdManager,
+			TraceDBObject traceDB) throws SoCTraceException {
+		EventProducer ep = new EventProducer(producerIdManager.getNextId());
+		ep.setName(PRODUCER_NAME_PREFIX + ep.getId());
+		ep.setType(NORMAL_PRODUCER_TYPE);
+		ep.setLocalId(PRODUCER_LOCAL_ID_PREFIX + ep.getId());
+		ep.setParentId(parentId);
+		producers.add(ep);
+		leaves.add(ep);
+		traceDB.save(ep);
+		
+		return ep;
 	}
 
 }
