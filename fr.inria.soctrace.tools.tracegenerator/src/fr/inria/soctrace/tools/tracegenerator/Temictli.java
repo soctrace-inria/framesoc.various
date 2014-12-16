@@ -70,8 +70,8 @@ public class Temictli extends FramesocTool {
 			TraceGenConfig aConfig = new TraceGenConfig();
 			aConfig.getCategories().add(EventCategory.STATE);
 			aConfig.setNumberOfEventType(10);
-			aConfig.setNumberOfProducers(11111);
-			aConfig.setNumberOfLeaves(10000);
+			aConfig.setNumberOfProducers(1111);
+			aConfig.setNumberOfLeaves(1000);
 			aConfig.setOnlyLeavesAsProducer(true);
 			aConfig.setNumberOfEvents(aNumberOfEvents);
 
