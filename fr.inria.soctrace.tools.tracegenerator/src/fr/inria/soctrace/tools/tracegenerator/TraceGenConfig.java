@@ -10,6 +10,8 @@ public class TraceGenConfig {
 	private int numberOfLeaves;
 	private boolean onlyLeavesAsProducer;
 	private long numberOfEvents;
+	private boolean forceIndex;
+	private int numberOfRuns;
 
 	public TraceGenConfig() {
 		categories = new ArrayList<Integer>();
@@ -66,6 +68,22 @@ public class TraceGenConfig {
 
 	public void setNumberOfEvents(long numberOfEvents) {
 		this.numberOfEvents = numberOfEvents;
+	}
+
+	public boolean isForceIndex() {
+		return forceIndex;
+	}
+
+	public void setForceIndex(boolean forceIndex) {
+		this.forceIndex = forceIndex;
+	}
+
+	public int getNumberOfRuns() {
+		return numberOfRuns;
+	}
+
+	public void setNumberOfRuns(int numberOfRuns) {
+		this.numberOfRuns = numberOfRuns;
 	}
 
 }

@@ -18,6 +18,7 @@ import fr.inria.soctrace.framesoc.core.tools.model.FramesocTool;
 import fr.inria.soctrace.framesoc.core.tools.model.IPluginToolJobBody;
 import fr.inria.soctrace.lib.model.utils.ModelConstants.EventCategory;
 import fr.inria.soctrace.lib.model.utils.SoCTraceException;
+import fr.inria.soctrace.lib.utils.DeltaManager;
 
 /**
  * Temictli is a trace generator for the Framesoc framework
@@ -25,17 +26,18 @@ import fr.inria.soctrace.lib.model.utils.SoCTraceException;
 
 public class Temictli extends FramesocTool {
 
-	private static final Logger logger = LoggerFactory
-			.getLogger(Temictli.class);
+	private static final Logger logger = LoggerFactory.getLogger(Temictli.class);
 
 	private String configFile;
 	private final String CatSeparator = "#";
 	private final String CSVDelimiter = ";";
 	public static final int NumberOfEventInCommit = 20000;
 
+	private static final boolean PRINT_TIME = true;
+
 	/**
-	 * Plugin Tool Job body: we use a Job since we have to perform a long
-	 * operation and we don't want to freeze the UI.
+	 * Plugin Tool Job body: we use a Job since we have to perform a long operation and we don't
+	 * want to freeze the UI.
 	 */
 	private class TemictliPluginJobBody implements IPluginToolJobBody {
 
@@ -105,10 +107,14 @@ public class Temictli extends FramesocTool {
 				BufferedReader bufFileReader;
 				bufFileReader = new BufferedReader(new FileReader(aFile));
 				String line;
-				
+
 				// Read configuration
 				while ((line = bufFileReader.readLine()) != null) {
+
+					line = line.trim();
 					if (line.isEmpty())
+						continue;
+					if (line.startsWith("#"))
 						continue;
 
 					String[] header = line.split(CSVDelimiter);
@@ -123,6 +129,8 @@ public class Temictli extends FramesocTool {
 					aConfig.setNumberOfLeaves(Integer.valueOf(header[3]));
 					aConfig.setOnlyLeavesAsProducer(Boolean.valueOf(header[4]));
 					aConfig.setNumberOfEvents(Long.valueOf(header[5]));
+					aConfig.setForceIndex(Boolean.valueOf(header[6]));
+					aConfig.setNumberOfRuns(Integer.valueOf(header[7]));
 
 					if (monitor.isCanceled()) {
 						bufFileReader.close();
@@ -132,10 +140,19 @@ public class Temictli extends FramesocTool {
 					TraceGenerator aGenerator = new TraceGenerator();
 					int numberOfWork = (int) (aConfig.getNumberOfEvents() / NumberOfEventInCommit) + 1;
 					monitor.beginTask("Generating trace", numberOfWork);
-					aGenerator.setTraceConfig(aConfig,
-							"virtualTrace_" + System.currentTimeMillis());
 
-					aGenerator.generateTrace(monitor);
+					for (int i = 0; i < aConfig.getNumberOfRuns(); i++) {
+						aGenerator.setTraceConfig(aConfig,
+								"virtualTrace_" + System.currentTimeMillis());
+						DeltaManager dm = new DeltaManager();
+						dm.start();
+						aGenerator.generateTrace(monitor);
+						dm.end();
+						if (PRINT_TIME) {
+							System.out.println(aConfig.getNumberOfEvents() + ", "
+									+ aConfig.isForceIndex() + ", " + dm.getDelta());
+						}
+					}
 				}
 
 				bufFileReader.close();
@@ -167,8 +184,8 @@ public class Temictli extends FramesocTool {
 
 	@Override
 	public void launch(String[] args) {
-		PluginImporterJob job = new PluginImporterJob(
-				"Temictli Trace Generator", new TemictliPluginJobBody(args));
+		PluginImporterJob job = new PluginImporterJob("Temictli Trace Generator",
+				new TemictliPluginJobBody(args));
 		job.setUser(true);
 		job.schedule();
 	}

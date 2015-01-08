@@ -96,7 +96,7 @@ public class TraceGenerator {
 	/**
 	 * Number of parameters (for Trace and Event)
 	 */
-	public int NUMBER_OF_PARAMETERS = 0;
+	public int NUMBER_OF_PARAMETERS = 2;
 
 	/**
 	 * Number of files
@@ -225,6 +225,11 @@ public class TraceGenerator {
 	private long currentTimestamp = MIN_TIMESTAMP;
 
 	/**
+	 * Force indexing even if disabled in config file
+	 */
+	private boolean forceIndex = false;
+
+	/**
 	 * Import a virtual trace into a trace DB according to the constants set.
 	 * 
 	 * @throws SoCTraceException
@@ -322,6 +327,9 @@ public class TraceGenerator {
 			traceDB.save(file);
 		}
 
+		if (forceIndex) {
+			traceDB.createTimestampIndex();
+		}
 		traceDB.close();
 
 		monitor.subTask("Filling trace metadata");
@@ -505,6 +513,7 @@ public class TraceGenerator {
 		numberOfEvents = aConfig.getNumberOfEvents();
 		numberOfLeaves = aConfig.getNumberOfLeaves();
 		onlyLeaveProducer = aConfig.isOnlyLeavesAsProducer();
+		forceIndex  = aConfig.isForceIndex();
 		numberOfCategories = categories.size();
 		dbName = aName;
 	}
