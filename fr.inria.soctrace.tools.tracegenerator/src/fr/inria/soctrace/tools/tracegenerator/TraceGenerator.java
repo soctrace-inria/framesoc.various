@@ -94,9 +94,11 @@ public class TraceGenerator {
 	public boolean onlyLeaveProducer = true;
 
 	/**
-	 * Number of parameters (for Trace and Event)
+	 * Number of parameters (Event)
 	 */
 	public int NUMBER_OF_PARAMETERS = 2;
+	
+	public int NUMBER_OF_TRACE_PARAMETERS = 0;
 
 	/**
 	 * Number of files
@@ -342,7 +344,7 @@ public class TraceGenerator {
 		// tt.setName(TYPE_NAME_PREFIX + tt.getId());
 		tptIdManager.setNextId(sysDB.getMaxId(
 				FramesocTable.TRACE_PARAM_TYPE.toString(), "ID") + 1);
-		for (i = 0; i < NUMBER_OF_PARAMETERS; i++) {
+		for (i = 0; i < NUMBER_OF_TRACE_PARAMETERS; i++) {
 			TraceParamType tpt = new TraceParamType(tptIdManager.getNextId());
 			tpt.setName(PARAMETER_NAME_PREFIX + tpt.getId());
 			tpt.setType(PARAMETER_TYPE);
