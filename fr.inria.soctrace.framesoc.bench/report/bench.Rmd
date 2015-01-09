@@ -2,7 +2,9 @@
 title: "Framesoc Bench"
 author: "Generoso Pagano"
 date: "01/08/2015"
-output: html_document
+output:
+  html_document: default
+  pdf_document: default
 ---
 
 # Intro
@@ -59,14 +61,16 @@ RAM: 16360588 kB
     
 ## Trace Import
 
+### Description
+
 * Factors: 
     + Trace size: measured in # of events, directly translatable in the DB size (MB)
     + Indexing: boolean (are we indexing on timestamp or not?)
 * Levels
     + Trace size:
-        - small: 1 Mevent (64 MB withoud index, 78 MB with index)
-        - medium: 10 Mevent (661 MB without index, 805 MB with index)
-        - big: 100 Mevent (7 GB without index, 8.7 GB with index)
+        - small: 1 Mevent (66.3 MB withoud index, 81.2 MB with index)
+        - medium: 10 Mevent (692.6 MB without index, 843.9 MB with index)
+        - big: 100 Mevent (7.5 GB without index, 9.3 GB with index)
     + Indexing:
         - true
         - false
@@ -74,9 +78,15 @@ RAM: 16360588 kB
     + Import time
 * Other parameters: 
     + fake traces created with the tool Temictli (available on https://github.com/soctrace-inria/framesoc.various)
+    + the Temictli configuration file used is provided in this archive (./conf/temictli_bench.conf).
     + all the traces have 2 event parameters for each event (this has been chosen as an average value over many trace formats)
+* Experiments:
+    + small traces: 30 repetitions
+    + medium traces: 10 repetitions
+    + big traces: 5 repetitions
+    + NOTE: as we will see below this number of repetition is largely enough to ensure very small confidence indervals.
 
-## Analysis
+### Analysis
 
 Import time given the number of events and the indexing property.
 
@@ -84,7 +94,7 @@ Import time given the number of events and the indexing property.
 library("data.table")                                                                                                                                              
 library("ggplot2")                                                                                                                                                 
 # create a summary: size, index, mean, error                                                                                                                        
-dt <- data.table(read.csv("temictli_bench.log"))                                                                                      
+dt <- data.table(read.csv("../results/temictli_bench.log"))                                                                                      
 setkey(dt,size,index)                                                                                                                                             
 results = dt[,.(mean=mean(time/1000), sd=sd(time/1000), n=NROW(time/1000)), by="size,index"]                                                                                       
 summary = data.frame(results[,.(size, index, mean, error = qnorm(0.975)*sd/sqrt(n))])                                                                               
@@ -103,3 +113,42 @@ summary
 ```
 
 TODO: maybe a linear regression for each group (index, no index)
+
+## Trace reading
+
+### Description
+
+Note: for factors and levels already seen above (e.g. trace size), we omit the description,
+since it is the same.
+
+* Factors: 
+    + Trace size
+    + Indexing
+    + Reading parameters: boolean
+    + Reading intervall: the number of events per interval (all events, 100k events, ...)
+* Levels
+    + Trace size:
+        - small
+        - medium
+        - big
+    + Indexing and Reading parameters:
+        - true
+        - false
+    + Interval
+        - all events
+	- 100k events
+* Metric:
+    + Total read time
+    + Interval read time
+    + Max used memory
+* Other parameters: 
+    + fake traces created above
+    + the program used for reading (fr.inria.soctrace.framesoc.bench) is available on github:
+    (https://github.com/soctrace-inria/framesoc.various)
+* Experiments:
+    + small traces: 30 repetitions
+    + medium traces: 10 repetitions
+    + big traces: 5 repetitions
+    + TODO NOTE: as we will see below this number of repetition is largely enough to ensure very small confidence indervals.
+
+### Analysis
