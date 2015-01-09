@@ -1,0 +1,105 @@
+---
+title: "Framesoc Bench"
+author: "Generoso Pagano"
+date: "01/08/2015"
+output: html_document
+---
+
+# Intro
+
+## Summary
+Framesoc infrastructure benchmark, concerning trace import times and event reading times.
+
+## Vocabulary
+* Parameter: something inuencing the behavior of the system.
+* Factor: parameter you decide to variate during experiment.
+* Level: value given to a factor.
+* Metric: what we want to measure
+
+# Environment
+
+Hard disk details, obtained with hdparm.
+
+```
+[generoso@generosohp ~]$ sudo hdparm -i /dev/sdb1
+
+/dev/sdb1:
+
+ Model=Hitachi HDS721010CLA630, FwRev=JP4OA41A, SerialNo=JP2940N03MSP5V
+ Config={ HardSect NotMFM HdSw>15uSec Fixed DTR>10Mbs }
+ RawCHS=16383/16/63, TrkSize=0, SectSize=0, ECCbytes=56
+ BuffType=DualPortCache, BuffSize=29999kB, MaxMultSect=16, MultSect=16
+ CurCHS=16383/16/63, CurSects=16514064, LBA=yes, LBAsects=1953525168
+ IORDY=on/off, tPIO={min:120,w/IORDY:120}, tDMA={min:120,rec:120}
+ PIO modes:  pio0 pio1 pio2 pio3 pio4 
+ DMA modes:  mdma0 mdma1 mdma2 
+ UDMA modes: udma0 udma1 udma2 udma3 udma4 udma5 *udma6 
+ AdvancedPM=no WriteCache=enabled
+ Drive conforms to: unknown:  ATA/ATAPI-2,3,4,5,6,7
+
+```
+
+System details, obtained with custom script.
+
+```
+[generoso@generosohp ~]$ ./read_configuration.sh 
+# OS details
+Linux generosohp.imag.fr 3.9.10-100.fc17.x86_64 #1 SMP Sun Jul 14 01:31:27 UTC 2013 x86_64 x86_64 x86_64 GNU/Linux
+# HW details
+Number of CPUs: 12
+CPU information (all cpus are equal):
+- model name : Intel(R) Xeon(R) CPU E5-1660 0 @ 3.30GHz
+- cache size : 15360 KB
+- hyperthreading : active
+Scaling governor: performance
+RAM: 16360588 kB
+```
+
+# Benchmark
+    
+## Trace Import
+
+* Factors: 
+    + Trace size: measured in # of events, directly translatable in the DB size (MB)
+    + Indexing: boolean (are we indexing on timestamp or not?)
+* Levels
+    + Trace size:
+        - small: 1 Mevent (64 MB withoud index, 78 MB with index)
+        - medium: 10 Mevent (661 MB without index, 805 MB with index)
+        - big: 100 Mevent (7 GB without index, 8.7 GB with index)
+    + Indexing:
+        - true
+        - false
+* Metric:
+    + Import time
+* Other parameters: 
+    + fake traces created with the tool Temictli (available on https://github.com/soctrace-inria/framesoc.various)
+    + all the traces have 2 event parameters for each event (this has been chosen as an average value over many trace formats)
+
+## Analysis
+
+Import time given the number of events and the indexing property.
+
+```{r, echo=FALSE}
+library("data.table")                                                                                                                                              
+library("ggplot2")                                                                                                                                                 
+# create a summary: size, index, mean, error                                                                                                                        
+dt <- data.table(read.csv("temictli_bench.log"))                                                                                      
+setkey(dt,size,index)                                                                                                                                             
+results = dt[,.(mean=mean(time/1000), sd=sd(time/1000), n=NROW(time/1000)), by="size,index"]                                                                                       
+summary = data.frame(results[,.(size, index, mean, error = qnorm(0.975)*sd/sqrt(n))])                                                                               
+# plot                                                                                                                                                             
+ggplot(summary, aes(x=size, y=mean, colour=index)) +                                                                                                                
+geom_errorbar(aes(ymin=mean-error, ymax=mean+error), width=.1) +                                                                                               
+geom_point() +                                                                                                                                                 
+scale_y_continuous(name="time (s)") +                                                                                                                          
+scale_x_continuous(name="# of events")                                                                                                                          
+```
+
+Text representation of the above plot.
+
+```{r, echo=FALSE}
+summary
+```
+
+TODO: maybe a linear regression for each group (index, no index)
