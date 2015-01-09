@@ -20,13 +20,13 @@ public class FramesocReaderConfig {
 	// # database_path size index runs 
 	public final static class ConfigLine {
 		public final static String SEPARATOR="\\s+";
-		public String dbPath;
+		public String dbName;
 		public long events;
 		public boolean index;
 		public int runs;
 		@Override
 		public String toString() {
-			return "ConfigLine [dbPath=" + dbPath + ", events=" + events + ", index=" + index
+			return "ConfigLine [dbName=" + dbName + ", events=" + events + ", index=" + index
 					+ ", runs=" + runs + "]";
 		}
 	}
@@ -130,7 +130,7 @@ public class FramesocReaderConfig {
 				
 				String tokens[] = line.split(ConfigLine.SEPARATOR);
 				ConfigLine l = new ConfigLine();
-				l.dbPath = tokens[0];
+				l.dbName = tokens[0];
 				l.events = Long.valueOf(tokens[1]);
 				l.index = Boolean.valueOf(tokens[2]);
 				l.runs = Integer.valueOf(tokens[3]);

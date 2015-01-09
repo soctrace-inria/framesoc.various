@@ -6,10 +6,14 @@ package fr.inria.soctrace.framesoc.bench.reading;
 import java.io.File;
 import java.util.List;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.eclipse.core.runtime.Assert;
 
 import fr.inria.soctrace.framesoc.bench.reading.FramesocReaderConfig.ConfigLine;
+import fr.inria.soctrace.lib.model.Event;
+import fr.inria.soctrace.lib.model.utils.SoCTraceException;
+import fr.inria.soctrace.lib.query.EventQuery;
+import fr.inria.soctrace.lib.storage.TraceDBObject;
+import fr.inria.soctrace.lib.utils.DeltaManager;
 
 /**
  * Framesoc Reader.
@@ -61,13 +65,13 @@ public class FramesocReader {
 		public long interval;
 		public long intervalTime;
 		public long totalTime;
-		public int maxMemory;
+		public long maxMemory;
 
 		public ReaderOutput(ConfigLine line) {
 			size = line.events;
 			index = line.index;
-		} 
-		
+		}
+
 		@Override
 		public String toString() {
 			return size + ", " + index + ", " + param + ", " + interval + ", " + intervalTime
@@ -75,11 +79,9 @@ public class FramesocReader {
 		}
 
 		public static String getHeader() {
-			return "size index param interval interval_time total_time max_memory";
+			return "size, index, param, interval, interval_time, total_time, max_memory";
 		}
 	}
-
-	private static final Logger logger = LoggerFactory.getLogger(FramesocReader.class);
 
 	/**
 	 * @param args
@@ -87,20 +89,15 @@ public class FramesocReader {
 	 */
 	public static void main(String[] args) {
 
-		logger.debug("Arguments: ");
-		for (String s : args) {
-			logger.debug(s);
-		}
-
 		if (args.length < 1) {
-			logger.error("Too few arguments");
+			System.err.println("Too few arguments");
 			return;
 		}
 
 		String configFile = args[0];
 		File t = new File(configFile);
 		if (!t.exists()) {
-			logger.error("File " + configFile + " not found");
+			System.err.println("File " + configFile + " not found");
 			return;
 		}
 
@@ -110,19 +107,24 @@ public class FramesocReader {
 		Boolean params[] = config.getParams();
 		Long intervals[] = config.getIntervals();
 
+		System.out.println(ReaderOutput.getHeader());
 		for (ConfigLine line : lines) {
 			for (Boolean param : params) {
 				for (Long interval : intervals) {
-					doExperiment(line, param, interval);
+					try {
+						doExperiment(line, param, interval);
+					} catch (SoCTraceException e) {
+						e.printStackTrace();
+						System.err.println("Experiment failed: " + line);
+					}
 				}
 			}
 		}
 
 	}
 
-	private static void doExperiment(ConfigLine line, Boolean param, Long interval) {
-		logger.debug(line.toString() + ", param=" + param + ", interval=" + interval);
-		System.out.println(ReaderOutput.getHeader());
+	private static void doExperiment(ConfigLine line, Boolean param, Long interval)
+			throws SoCTraceException {
 		for (int i = 0; i < line.runs; i++) {
 			ReaderOutput output = null;
 			if (interval == 0) {
@@ -134,14 +136,26 @@ public class FramesocReader {
 		}
 	}
 
-	private static ReaderOutput readAll(ConfigLine line, Boolean param) {
+	private static ReaderOutput readAll(ConfigLine line, Boolean param) throws SoCTraceException {
 		ReaderOutput output = new ReaderOutput(line);
 		output.param = param;
 		output.interval = 0;
 
-		// TODO compute totalTime and maxMemory
-		
+		DeltaManager dm = new DeltaManager();
+		dm.start();
+
+		TraceDBObject traceDB = TraceDBObject.openNewIstance(line.dbName);
+		EventQuery eq = new EventQuery(traceDB);
+		eq.setLoadParameters(param);
+		List<Event> elist = eq.getList();
+		Assert.isTrue(elist.size() == line.events);
+		traceDB.close();
+
+		dm.end();
+		output.totalTime = dm.getDelta();
 		output.intervalTime = output.totalTime;
+		output.maxMemory = getUsedHeap();
+
 		return output;
 	}
 
@@ -150,9 +164,26 @@ public class FramesocReader {
 		output.param = param;
 		output.interval = interval;
 
-		// TODO compute intervalTime, totalTime and maxMemory
-		
+		DeltaManager dm = new DeltaManager();
+		int intervals = 0;
+		dm.start();
+
+		// TODO read
+		// TODO update intervals
+
+		dm.end();
+		output.totalTime = dm.getDelta();
+		output.intervalTime = output.totalTime;
+		if (intervals > 0) {
+			output.intervalTime = output.totalTime / intervals;
+		}
+		output.maxMemory = getUsedHeap();
+
 		return output;
 	}
 
+	private static Long getUsedHeap() {
+		Runtime runtime = Runtime.getRuntime();
+		return (runtime.totalMemory() - runtime.freeMemory());
+	}
 }
