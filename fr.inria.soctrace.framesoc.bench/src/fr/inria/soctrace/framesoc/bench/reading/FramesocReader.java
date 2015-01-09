@@ -65,7 +65,6 @@ public class FramesocReader {
 		public long interval;
 		public long intervalTime;
 		public long totalTime;
-		public long maxMemory;
 
 		public ReaderOutput(ConfigLine line) {
 			size = line.events;
@@ -75,11 +74,11 @@ public class FramesocReader {
 		@Override
 		public String toString() {
 			return size + ", " + index + ", " + param + ", " + interval + ", " + intervalTime
-					+ ", " + totalTime + ", " + maxMemory;
+					+ ", " + totalTime;
 		}
 
 		public static String getHeader() {
-			return "size, index, param, interval, interval_time, total_time, max_memory";
+			return "size, index, param, interval, interval_time, total_time";
 		}
 	}
 
@@ -135,7 +134,7 @@ public class FramesocReader {
 			System.out.println(output.toString());
 		}
 	}
-
+	
 	private static ReaderOutput readAll(ConfigLine line, Boolean param) throws SoCTraceException {
 		ReaderOutput output = new ReaderOutput(line);
 		output.param = param;
@@ -148,13 +147,12 @@ public class FramesocReader {
 		EventQuery eq = new EventQuery(traceDB);
 		eq.setLoadParameters(param);
 		List<Event> elist = eq.getList();
-		Assert.isTrue(elist.size() == line.events);
+		Assert.isTrue(elist.size() == line.events, "Wrong number of events");
 		traceDB.close();
 
 		dm.end();
 		output.totalTime = dm.getDelta();
 		output.intervalTime = output.totalTime;
-		output.maxMemory = getUsedHeap();
 
 		return output;
 	}
@@ -177,13 +175,10 @@ public class FramesocReader {
 		if (intervals > 0) {
 			output.intervalTime = output.totalTime / intervals;
 		}
-		output.maxMemory = getUsedHeap();
 
 		return output;
 	}
 
-	private static Long getUsedHeap() {
-		Runtime runtime = Runtime.getRuntime();
-		return (runtime.totalMemory() - runtime.freeMemory());
-	}
+	// TODO use heap monitor to measure memory on single executions
+	
 }
