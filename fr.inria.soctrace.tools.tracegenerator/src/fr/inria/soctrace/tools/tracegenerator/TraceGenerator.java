@@ -36,8 +36,7 @@ import fr.inria.soctrace.lib.storage.TraceDBObject;
 import fr.inria.soctrace.lib.utils.IdManager;
 
 /**
- * Virtual importer writing into the DB a virtual trace whose parameters may be
- * easily configured.
+ * Virtual importer writing into the DB a virtual trace whose parameters may be easily configured.
  * 
  * <pre>
  * Conventions: 
@@ -52,8 +51,7 @@ import fr.inria.soctrace.lib.utils.IdManager;
  */
 public class TraceGenerator {
 
-	private static final Logger logger = LoggerFactory
-			.getLogger(TraceGenerator.class);
+	private static final Logger logger = LoggerFactory.getLogger(TraceGenerator.class);
 
 	/**
 	 * Virtual importer DB name
@@ -91,13 +89,14 @@ public class TraceGenerator {
 	public long numberOfEvents = 13;
 
 	public int numberOfLeaves = 0;
+	
 	public boolean onlyLeaveProducer = true;
 
 	/**
 	 * Number of parameters (Event)
 	 */
 	public int NUMBER_OF_PARAMETERS = 2;
-	
+
 	public int NUMBER_OF_TRACE_PARAMETERS = 0;
 
 	/**
@@ -119,6 +118,7 @@ public class TraceGenerator {
 	 * Trace Type ID
 	 */
 	public static int TRACE_TYPE_ID = 0;
+	
 	public static String TRACE_TYPE = "GENERATED_TRACES";
 
 	/**
@@ -217,8 +217,7 @@ public class TraceGenerator {
 				+ getNumberOfEvents(EventCategory.VARIABLE);
 		long nonpunctuals = getNumberOfEvents(EventCategory.STATE)
 				+ getNumberOfEvents(EventCategory.LINK);
-		return MIN_TIMESTAMP + punctuals + nonpunctuals * (MAX_DURATION + 1)
-				- 1;
+		return MIN_TIMESTAMP + punctuals + nonpunctuals * (MAX_DURATION + 1) - 1;
 	}
 
 	/**
@@ -236,8 +235,7 @@ public class TraceGenerator {
 	 * 
 	 * @throws SoCTraceException
 	 */
-	public void generateTrace(IProgressMonitor monitor)
-			throws SoCTraceException {
+	public void generateTrace(IProgressMonitor monitor) throws SoCTraceException {
 		/*
 		 * Trace events
 		 */
@@ -262,13 +260,12 @@ public class TraceGenerator {
 
 		monitor.subTask("Generating event types");
 		int i = 0;
-		
+
 		// Create event types
 		for (i = 0; i < numberOfEventType; i++) {
 			// Spread them uniformly between the possible categories
 			int category = categories.get(i % categories.size());
-			EventType aType = createTypes(traceDB, category, etIdManager,
-					eptIdManager);
+			EventType aType = createTypes(traceDB, category, etIdManager, eptIdManager);
 			typesList.add(aType);
 		}
 
@@ -301,8 +298,7 @@ public class TraceGenerator {
 			ep.setLocalId(PRODUCER_LOCAL_ID_PREFIX + ep.getId());
 
 			// Randomize parent id among producers
-			int parentId = producers.get(rand.nextInt(potentialParentsSize))
-					.getId();
+			int parentId = producers.get(rand.nextInt(potentialParentsSize)).getId();
 			ep.setParentId(parentId);
 			coeffMod.put(ep, Math.abs(rand.nextGaussian() * 100.0));
 			producers.add(ep);
@@ -313,8 +309,7 @@ public class TraceGenerator {
 
 		monitor.subTask("Generating events");
 		// Create events
-		createEvent(traceDB, typesList, producers, leaves, eIdManager,
-				epIdManager, monitor);
+		createEvent(traceDB, typesList, producers, leaves, eIdManager, epIdManager, monitor);
 
 		if (monitor.isCanceled()) {
 			traceDB.dropDatabase();
@@ -342,8 +337,7 @@ public class TraceGenerator {
 
 		TraceType tt = buildTraceType(sysDB);
 		// tt.setName(TYPE_NAME_PREFIX + tt.getId());
-		tptIdManager.setNextId(sysDB.getMaxId(
-				FramesocTable.TRACE_PARAM_TYPE.toString(), "ID") + 1);
+		tptIdManager.setNextId(sysDB.getMaxId(FramesocTable.TRACE_PARAM_TYPE.toString(), "ID") + 1);
 		for (i = 0; i < NUMBER_OF_TRACE_PARAMETERS; i++) {
 			TraceParamType tpt = new TraceParamType(tptIdManager.getNextId());
 			tpt.setName(PARAMETER_NAME_PREFIX + tpt.getId());
@@ -352,8 +346,7 @@ public class TraceGenerator {
 			sysDB.save(tpt);
 		}
 
-		Trace t = new Trace(
-				sysDB.getNewId(FramesocTable.TRACE.toString(), "ID"));
+		Trace t = new Trace(sysDB.getNewId(FramesocTable.TRACE.toString(), "ID"));
 		t.setAlias(TRACE_NAME + "_" + t.getId());
 		t.setBoard(METADATA);
 		t.setDbName(dbName);
@@ -369,8 +362,7 @@ public class TraceGenerator {
 		t.setTracedApplication(METADATA);
 		t.setTracingDate(new Timestamp(new Date().getTime()));
 		t.setType(tt);
-		tpIdManager.setNextId(sysDB.getMaxId(
-				FramesocTable.TRACE_PARAM.toString(), "ID") + 1);
+		tpIdManager.setNextId(sysDB.getMaxId(FramesocTable.TRACE_PARAM.toString(), "ID") + 1);
 		for (TraceParamType tpt : tt.getTraceParamTypes()) {
 			TraceParam tp = new TraceParam(tpIdManager.getNextId());
 			tp.setTraceParamType(tpt);
@@ -383,8 +375,7 @@ public class TraceGenerator {
 		sysDB.close();
 	}
 
-	private TraceType buildTraceType(SystemDBObject sysDB)
-			throws SoCTraceException {
+	private TraceType buildTraceType(SystemDBObject sysDB) throws SoCTraceException {
 
 		// If the trace type exist already
 		if (sysDB.isTraceTypePresent(TRACE_TYPE)) {
@@ -392,8 +383,8 @@ public class TraceGenerator {
 			return sysDB.getTraceType(TRACE_TYPE);
 		} else {
 			logger.debug("Tracetype does not exist");
-			TraceType traceType = new TraceType(sysDB.getNewId(
-					FramesocTable.TRACE_TYPE.toString(), "ID"));
+			TraceType traceType = new TraceType(sysDB.getNewId(FramesocTable.TRACE_TYPE.toString(),
+					"ID"));
 			traceType.setName(TRACE_TYPE);
 			sysDB.save(traceType);
 			return traceType;
@@ -401,9 +392,8 @@ public class TraceGenerator {
 	}
 
 	private void createEvent(TraceDBObject traceDB, List<EventType> typesList,
-			List<EventProducer> producers, List<EventProducer> leaves,
-			IdManager eIdManager, IdManager epIdManager,
-			IProgressMonitor monitor) throws SoCTraceException {
+			List<EventProducer> producers, List<EventProducer> leaves, IdManager eIdManager,
+			IdManager epIdManager, IProgressMonitor monitor) throws SoCTraceException {
 		int i;
 		Random rand = new Random();
 		for (i = 0; i < numberOfEvents; i++) {
@@ -492,9 +482,8 @@ public class TraceGenerator {
 		}
 	}
 
-	private EventType createTypes(TraceDBObject traceDB, int category,
-			IdManager etIdManager, IdManager eptIdManager)
-			throws SoCTraceException {
+	private EventType createTypes(TraceDBObject traceDB, int category, IdManager etIdManager,
+			IdManager eptIdManager) throws SoCTraceException {
 		EventType et = new EventType(etIdManager.getNextId(), category);
 		et.setName(TYPE_NAME_PREFIX + et.getId());
 		for (int j = 0; j < NUMBER_OF_PARAMETERS; j++) {
@@ -515,7 +504,7 @@ public class TraceGenerator {
 		numberOfEvents = aConfig.getNumberOfEvents();
 		numberOfLeaves = aConfig.getNumberOfLeaves();
 		onlyLeaveProducer = aConfig.isOnlyLeavesAsProducer();
-		forceIndex  = aConfig.isForceIndex();
+		forceIndex = aConfig.isForceIndex();
 		numberOfCategories = categories.size();
 		dbName = aName;
 	}

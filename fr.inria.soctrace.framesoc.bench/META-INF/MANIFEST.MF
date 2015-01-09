@@ -5,6 +5,8 @@ Bundle-SymbolicName: fr.inria.soctrace.framesoc.bench
 Bundle-Version: 1.0.0.qualifier
 Bundle-Activator: fr.inria.soctrace.framesoc.bench.Activator
 Require-Bundle: org.eclipse.ui,
- org.eclipse.core.runtime
+ org.eclipse.core.runtime,
+ fr.inria.soctrace.lib.slf4j;bundle-version="1.0.1"
 Bundle-RequiredExecutionEnvironment: JavaSE-1.7
 Bundle-ActivationPolicy: lazy
+Import-Package: org.slf4j

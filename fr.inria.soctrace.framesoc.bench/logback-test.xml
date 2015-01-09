@@ -1,0 +1,18 @@
+<configuration>
+
+	<appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+		<encoder>
+			<pattern>%d{HH:mm:ss.SSS} [%thread] %-5level{36} %logger{50} - %msg%n</pattern>
+			<!-- <pattern>[%-5level] [%30.-30logger{0}] - %msg%n </pattern> -->
+		</encoder>
+	</appender>
+
+	<!-- Various -->
+	<logger name="fr.inria.soctrace.framesoc.bench" level="off" />
+
+	<!-- Default -->
+	<root level="off">
+		<appender-ref ref="STDOUT" />
+	</root>
+
+</configuration>
