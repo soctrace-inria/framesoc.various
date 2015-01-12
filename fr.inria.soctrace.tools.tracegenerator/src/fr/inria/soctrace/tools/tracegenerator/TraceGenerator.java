@@ -3,7 +3,6 @@ package fr.inria.soctrace.tools.tracegenerator;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Random;
 
@@ -184,9 +183,11 @@ public class TraceGenerator {
 	public final static int MAX_DURATION = 20;
 	public final static int MAX_VARIABLE_DURATION = 15;
 	public final static int MAX_STATE_DURATION = 10000;
-	public final static int MAX_ADVANCE_DURATION = 15;
 
-	public HashMap<EventProducer, Double> coeffMod;
+	List<EventProducer> producers = new ArrayList<EventProducer>();
+	List<EventProducer> leaves = new ArrayList<EventProducer>();
+	long numberOfGeneratedEvents;
+	long maxTimeStamp;
 
 	/*
 	 * Short-cuts
@@ -252,10 +253,7 @@ public class TraceGenerator {
 
 		// event category, types
 		List<EventType> typesList = new ArrayList<EventType>();
-		List<EventProducer> producers = new ArrayList<EventProducer>();
-		List<EventProducer> leaves = new ArrayList<EventProducer>();
 
-		coeffMod = new HashMap<EventProducer, Double>();
 		Random rand = new Random();
 
 		monitor.subTask("Generating event types");
@@ -270,41 +268,24 @@ public class TraceGenerator {
 		}
 
 		monitor.subTask("Generating event producer");
-		int rootId = -1;
+		EventProducer root = createEventProd(-1, producerIdManager, traceDB);
+		
 		// Create non-leave producer
 		for (i = 0; i < numberOfProducers - numberOfLeaves; i++) {
-			EventProducer ep = new EventProducer(producerIdManager.getNextId());
-			ep.setName(PRODUCER_NAME_PREFIX + ep.getId());
-			ep.setType(NORMAL_PRODUCER_TYPE);
-			ep.setLocalId(PRODUCER_LOCAL_ID_PREFIX + ep.getId());
-			if (rootId == -1) {
-				ep.setParentId(EventProducer.NO_PARENT_ID);
-				rootId = ep.getId();
-			} else {
-				ep.setParentId(rootId);
-			}
-
-			coeffMod.put(ep, Math.abs(rand.nextGaussian() * 100.0));
-			producers.add(ep);
-			traceDB.save(ep);
+			createEventProd(root.getId(),
+                    producerIdManager, traceDB);
 		}
 
 		int potentialParentsSize = producers.size();
 		// Create leave producers
 		for (i = 0; i < numberOfLeaves; i++) {
-			EventProducer ep = new EventProducer(producerIdManager.getNextId());
-			ep.setName(PRODUCER_NAME_PREFIX + ep.getId());
-			ep.setType(LEAVE_PRODUCER_TYPE);
-			ep.setLocalId(PRODUCER_LOCAL_ID_PREFIX + ep.getId());
+			// Randomize parent ID among producers
+			int parentId = producers.get(rand.nextInt(potentialParentsSize))
+					.getId();
 
-			// Randomize parent id among producers
-			int parentId = producers.get(rand.nextInt(potentialParentsSize)).getId();
-			ep.setParentId(parentId);
-			coeffMod.put(ep, Math.abs(rand.nextGaussian() * 100.0));
-			producers.add(ep);
-			leaves.add(ep);
-			traceDB.save(ep);
+			leaves.add(createEventProd(parentId, producerIdManager, traceDB));
 		}
+		
 		traceDB.commit();
 
 		monitor.subTask("Generating events");
@@ -352,12 +333,12 @@ public class TraceGenerator {
 		t.setDbName(dbName);
 		t.setDescription(METADATA);
 		t.setNumberOfCpus(1);
-		t.setNumberOfEvents((int) numberOfEvents);
+		t.setNumberOfEvents((int) numberOfGeneratedEvents);
 		t.setOperatingSystem(METADATA);
 		t.setOutputDevice(METADATA);
 		t.setProcessed(false);
 		t.setMinTimestamp(MIN_TIMESTAMP);
-		t.setMaxTimestamp(currentTimestamp - 1);
+		t.setMaxTimestamp(maxTimeStamp);
 		t.setTimeUnit(TimeUnit.NANOSECONDS.getInt());
 		t.setTracedApplication(METADATA);
 		t.setTracingDate(new Timestamp(new Date().getTime()));
@@ -392,92 +373,104 @@ public class TraceGenerator {
 	}
 
 	private void createEvent(TraceDBObject traceDB, List<EventType> typesList,
-			List<EventProducer> producers, List<EventProducer> leaves, IdManager eIdManager,
-			IdManager epIdManager, IProgressMonitor monitor) throws SoCTraceException {
+			List<EventProducer> producers, List<EventProducer> leaves,
+			IdManager eIdManager, IdManager epIdManager,
+			IProgressMonitor monitor) throws SoCTraceException {
 		int i;
 		Random rand = new Random();
-		for (i = 0; i < numberOfEvents; i++) {
-			// Randomize event type
-			int type = rand.nextInt(typesList.size());
-			EventType et = typesList.get(type);
-			Event e = null;
-			EventProducer eProd;
-			EventProducer nodeProd = null;
-			// Dispatch uniformly the events between producers
-			if (onlyLeaveProducer) {
-				eProd = leaves.get(i % leaves.size());
-				nodeProd = producers.get(eProd.getParentId());
-			} else {
-				eProd = producers.get(i % producers.size());
-				nodeProd = eProd;
-			}
+		List<EventProducer> eventProducers;
+		numberOfGeneratedEvents = 0l;
+		maxTimeStamp = MIN_TIMESTAMP;
 
-			switch (et.getCategory()) {
-			case EventCategory.PUNCTUAL_EVENT:
-				e = new PunctualEvent(eIdManager.getNextId());
-				e.setTimestamp(currentTimestamp);
-				currentTimestamp++;
-				break;
-			case EventCategory.STATE:
-				State s = new State(eIdManager.getNextId());
-				s.setTimestamp(currentTimestamp);
+		// Get the active events producers
+		if (onlyLeaveProducer) {
+			eventProducers = leaves;
+		} else {
+			eventProducers = producers;
+		}
 
-				// Randomize state duration
-				int duration = rand.nextInt(MAX_STATE_DURATION + 1) + 1;
-				duration = (int) (((double) duration) * coeffMod.get(nodeProd));
-				s.setEndTimestamp(currentTimestamp + duration);
-				s.setImbricationLevel(0);
+		// For each producer
+		for (EventProducer eProd : eventProducers) {
+			// Reset time at MIN_TIMESTAMP
+			currentTimestamp = MIN_TIMESTAMP;
+			
+			// Create "number of events / number of active producers" events 
+			for (i = 0; i < numberOfEvents / eventProducers.size(); i++) {
+				// Randomize event type
+				int type = rand.nextInt(typesList.size());
+				EventType et = typesList.get(type);
+				Event e = null;
 
-				// Randomize timestamp of the next events
-				int timeAdvance = rand.nextInt(MAX_ADVANCE_DURATION);
-				currentTimestamp = currentTimestamp + timeAdvance;
-				e = s;
-				break;
-			case EventCategory.LINK:
-				Link l = new Link(eIdManager.getNextId());
-				l.setTimestamp(currentTimestamp);
-				l.setEndTimestamp(currentTimestamp + MAX_DURATION);
-				if (onlyLeaveProducer) {// XXX
-					l.setEndProducer(leaves.get(i % leaves.size()));
-				} else {
-					l.setEndProducer(producers.get(i % producers.size()));
-				}
-				currentTimestamp = currentTimestamp + MAX_DURATION + 1;
-				e = l;
-				break;
-			case EventCategory.VARIABLE:
-				Variable v = new Variable(eIdManager.getNextId());
-				v.setTimestamp(currentTimestamp);
-				v.setEndTimestamp(0); // XXX
-				currentTimestamp++; // XXX
-				e = v;
-				break;
-			}
+				switch (et.getCategory()) {
+				case EventCategory.PUNCTUAL_EVENT:
+					e = new PunctualEvent(eIdManager.getNextId());
+					e.setTimestamp(currentTimestamp);
+					checkMaxTimestamp(currentTimestamp);
+					currentTimestamp++;
+					break;
+				case EventCategory.STATE:
+					State s = new State(eIdManager.getNextId());
+					s.setTimestamp(currentTimestamp);
 
-			Assert.isNotNull(e, "Null event: wrong category");
+					// Randomize state duration and make sure we don't have a
+					// timestamp over MAX.Long
+					long duration = (Math.abs(rand.nextLong()) / (numberOfEvents + 1l)) + 1l;
 
-			e.setCategory(et.getCategory());
-			e.setType(et);
-			e.setEventProducer(eProd);
-			e.setCpu(CPU);
-			e.setPage(PAGE);
-
-			for (EventParamType ept : et.getEventParamTypes()) {
-				EventParam ep = new EventParam(epIdManager.getNextId());
-				ep.setEvent(e);
-				ep.setEventParamType(ept);
-				ep.setValue(PARAMETER_VALUE);
-				traceDB.save(ep);
-			}
-
-			traceDB.save(e);
-			if (i % Temictli.NumberOfEventInCommit == 0) {
-				if (monitor.isCanceled()) {
-					return;
+					s.setEndTimestamp(currentTimestamp + duration);
+					s.setImbricationLevel(0);
+					currentTimestamp = currentTimestamp + duration;
+					checkMaxTimestamp(currentTimestamp);
+					e = s;
+					break;
+				case EventCategory.LINK:
+					Link l = new Link(eIdManager.getNextId());
+					l.setTimestamp(currentTimestamp);
+					l.setEndTimestamp(currentTimestamp + MAX_DURATION);
+					if (onlyLeaveProducer) {// XXX
+						l.setEndProducer(leaves.get(i % leaves.size()));
+					} else {
+						l.setEndProducer(producers.get(i % producers.size()));
+					}
+					currentTimestamp = currentTimestamp + MAX_DURATION + 1;
+					checkMaxTimestamp(currentTimestamp);
+					e = l;
+					break;
+				case EventCategory.VARIABLE:
+					Variable v = new Variable(eIdManager.getNextId());
+					v.setTimestamp(currentTimestamp);
+					v.setEndTimestamp(0); // XXX
+					checkMaxTimestamp(currentTimestamp);
+					currentTimestamp++; // XXX
+					e = v;
+					break;
 				}
 
-				traceDB.commit();
-				monitor.worked(1);
+				Assert.isNotNull(e, "Null event: wrong category");
+
+				e.setCategory(et.getCategory());
+				e.setType(et);
+				e.setEventProducer(eProd);
+				e.setCpu(CPU);
+				e.setPage(PAGE);
+
+				for (EventParamType ept : et.getEventParamTypes()) {
+					EventParam ep = new EventParam(epIdManager.getNextId());
+					ep.setEvent(e);
+					ep.setEventParamType(ept);
+					ep.setValue(PARAMETER_VALUE);
+					traceDB.save(ep);
+				}
+
+				traceDB.save(e);
+				numberOfGeneratedEvents++;
+				if (numberOfGeneratedEvents % Temictli.NumberOfEventInCommit == 0) {
+					if (monitor.isCanceled()) {
+						return;
+					}
+
+					traceDB.commit();
+					monitor.worked(1);
+				}
 			}
 		}
 	}
@@ -496,6 +489,44 @@ public class TraceGenerator {
 		traceDB.save(et);
 		return et;
 	}
+	
+	/**
+	 * Create an event producer with the given parameter
+	 * 
+	 * @param parentId
+	 *            the ID of the parent event producer
+	 * @param producerIdManager
+	 *            the producer id manager to create the ID of the EP
+	 * @param traceDB
+	 *            the traceDBObject to save the EP
+	 * @return the event producer
+	 * @throws SoCTraceException
+	 */
+	public EventProducer createEventProd(int parentId,
+			IdManager producerIdManager, TraceDBObject traceDB)
+			throws SoCTraceException {
+		EventProducer ep = new EventProducer(producerIdManager.getNextId());
+		ep.setName(PRODUCER_NAME_PREFIX + ep.getId());
+		ep.setType(NORMAL_PRODUCER_TYPE);
+		ep.setLocalId(PRODUCER_LOCAL_ID_PREFIX + ep.getId());
+		ep.setParentId(parentId);
+		producers.add(ep);
+		traceDB.save(ep);
+
+		return ep;
+	}
+	
+	/**
+	 * Check if a timestamp is the actual max time stamp
+	 * 
+	 * @param aTimestamp
+	 *            the tested timestamp
+	 */
+	void checkMaxTimestamp(long aTimestamp) {
+		if(aTimestamp > maxTimeStamp)
+			maxTimeStamp = aTimestamp;
+	}
+	
 
 	public void setTraceConfig(TraceGenConfig aConfig, String aName) {
 		categories = aConfig.getCategories();
