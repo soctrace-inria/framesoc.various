@@ -91,16 +91,15 @@ RAM: 16360588 kB
 Import time given the number of events and the indexing property.
 
 ```{r, echo=FALSE}
-library("data.table")                                                                                                                                              
+library("plyr")                                                                                                                                              
 library("ggplot2")                                                                                                                                                 
-# create a summary: size, index, mean, error                                                                                                                        
-dt <- data.table(read.csv("../results/temictli_bench.log"))                                                                                      
-setkey(dt,size,index)                                                                                                                                             
-results = dt[,.(mean=mean(time/1000), sd=sd(time/1000), n=NROW(time/1000)), by="size,index"]                                                                                       
-summary = data.frame(results[,.(size, index, mean, error = qnorm(0.975)*sd/sqrt(n))])                                                                               
+# read data
+df <- read.csv("../results/temictli_bench.log")
+# aggregate
+re <- ddply(df, c("size", "index"), summarise, N = length(time), mean = mean(time/1000), sd = sd(time/1000), se = sd / sqrt(N) )
 # plot                                                                                                                                                             
-ggplot(summary, aes(x=size, y=mean, colour=index)) +                                                                                                                
-geom_errorbar(aes(ymin=mean-error, ymax=mean+error), width=.1) +                                                                                               
+ggplot(re, aes(x=size, y=mean, colour=index)) +                                                                                                                
+geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1) +                                                                                               
 geom_point() +                                                                                                                                                 
 scale_y_continuous(name="time (s)") +                                                                                                                          
 scale_x_continuous(name="# of events")                                                                                                                          
@@ -109,7 +108,7 @@ scale_x_continuous(name="# of events")
 Text representation of the above plot.
 
 ```{r, echo=FALSE}
-summary
+re
 ```
 
 TODO: maybe a linear regression for each group (index, no index)
