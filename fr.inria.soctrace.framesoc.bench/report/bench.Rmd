@@ -136,7 +136,7 @@ since it is the same.
         - false
     + Interval
         - all events
-	- 100k events
+        - 100k events (choosen as best compromise between speed and ui interactivity)
 * Metric:
     + Total read time
     + Interval read time
@@ -152,3 +152,5 @@ since it is the same.
     + TODO NOTE: as we will see below this number of repetition is largely enough to ensure very small confidence indervals.
 
 ### Analysis
+
+Total read time in different configurations.
