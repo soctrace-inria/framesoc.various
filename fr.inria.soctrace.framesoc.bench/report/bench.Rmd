@@ -4,7 +4,6 @@ author: "Generoso Pagano"
 date: "01/08/2015"
 output:
   html_document: default
-  pdf_document: default
 ---
 
 # Intro
@@ -136,7 +135,7 @@ since it is the same.
         - false
     + Interval
         - all events
-	- 100k events
+	      - 100k events
 * Metric:
     + Total read time
     + Interval read time
@@ -152,3 +151,34 @@ since it is the same.
     + TODO NOTE: as we will see below this number of repetition is largely enough to ensure very small confidence indervals.
 
 ### Analysis
+
+```{r, echo=FALSE}
+library("data.table")                                                                                                                                              
+library("ggplot2")                                                                                                                                                 
+# create a summary: size, index, mean, error                                                                                                                        
+dt <- data.table(read.csv("../results/reader.log"))                                                                                      
+setkey(dt,size,index,param,interval)                                                                                                                                             
+results = dt[,.(imean=mean(interval_time/1000), tmean=mean(total_time/1000), isd=sd(interval_time/1000), tsd=sd(total_time/1000), n=NROW(total_time)), by="size,index,param,interval"]                                                                                       
+res = data.frame(results[,.(size, index, param, interval, imean, ierror=qnorm(0.975)*isd/sqrt(n), tmean, terror = qnorm(0.975)*tsd/sqrt(n))])            
+```
+
+Text representation of the above results.
+
+```{r, echo=FALSE}
+res
+```
+
+Parse res with python script, because I don't know how to do it with R yet...
+And obtain, parsed.log.
+
+```{r, echo=FALSE}
+df <- data.frame(read.csv("../results/parsed.log"))
+small <- df[df$size=='10000000',]
+# plot                                                                                                                                                             
+ggplot(small, aes(x=size, y=tmean, colour=config)) +  
+geom_bar(position=position_dodge(), stat="identity") +
+geom_errorbar(aes(ymin=tmean-terror, ymax=tmean+terror), width=.1) +                                                                                               
+scale_y_continuous(name="time (s)")                                                                                                                    
+#scale_x_continuous(name="# of events")                                                                                                                          
+```
+
