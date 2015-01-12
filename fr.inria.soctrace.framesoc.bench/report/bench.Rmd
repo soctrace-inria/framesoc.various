@@ -152,20 +152,21 @@ since it is the same.
     + TODO NOTE: as we will see below this number of repetition is largely enough to ensure very small confidence indervals.
 
 ### Analysis
+
 ```{r, echo=FALSE}
 library("data.table")                                                                                                                                              
 library("ggplot2")                                                                                                                                                 
 # create a summary: size, index, mean, error                                                                                                                        
-dt <- data.table(read.csv("../results/reader.log"))                                                                                      
+dt <- data.table(read.csv("../results/reader_first.log"))                                                                                      
 setkey(dt,size,index,param,interval)                                                                                                                                             
 results = dt[,.(imean=mean(interval_time/1000), tmean=mean(total_time/1000), isd=sd(interval_time/1000), tsd=sd(total_time/1000), n=NROW(total_time)), by="size,index,param,interval"]                                                                                       
 res = data.frame(results[,.(size, index, param, interval, imean, ierror=qnorm(0.975)*isd/sqrt(n), tmean, terror = qnorm(0.975)*tsd/sqrt(n))])            
 ```
 
-Text representation of the above results.
+Text representation.
 
 ```{r, echo=FALSE}
-res
+res[c(1,2,3,4,5,7)]
 ```
 
 Parse res with python script, because I don't know how to do it with R yet...
