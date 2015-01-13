@@ -7,6 +7,51 @@ output:
   pdf_document: default
 ---
 
+```{r, echo=FALSE}
+## Summarizes data.
+## Gives count, mean, standard deviation, standard error of the mean, and confidence interval (default 95%).
+##   data: a data frame.
+##   measurevar: the name of a column that contains the variable to be summariezed
+##   groupvars: a vector containing names of columns that contain grouping variables
+##   na.rm: a boolean that indicates whether to ignore NA's
+##   conf.interval: the percent range of the confidence interval (default is 95%)
+summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
+                      conf.interval=.95, .drop=TRUE) {
+    require(plyr)
+
+    # New version of length which can handle NA's: if na.rm==T, don't count them
+    length2 <- function (x, na.rm=FALSE) {
+        if (na.rm) sum(!is.na(x))
+        else       length(x)
+    }
+
+    # This does the summary. For each group's data frame, return a vector with
+    # N, mean, and sd
+    datac <- ddply(data, groupvars, .drop=.drop,
+      .fun = function(xx, col) {
+        c(N    = length2(xx[[col]], na.rm=na.rm),
+          mean = mean   (xx[[col]], na.rm=na.rm),
+          sd   = sd     (xx[[col]], na.rm=na.rm)
+        )
+      },
+      measurevar
+    )
+
+    # Rename the "mean" column    
+    datac <- rename(datac, c("mean" = measurevar))
+
+    datac$se <- datac$sd / sqrt(datac$N)  # Calculate standard error of the mean
+
+    # Confidence interval multiplier for standard error
+    # Calculate t-statistic for confidence interval: 
+    # e.g., if conf.interval is .95, use .975 (above/below), and use df=N-1
+    ciMult <- qt(conf.interval/2 + .5, datac$N-1)
+    datac$ci <- datac$se * ciMult
+
+    return(datac)
+}
+```
+
 # Intro
 
 ## Summary
@@ -96,10 +141,14 @@ library("ggplot2")
 # read data
 df <- read.csv("../results/temictli_bench.log")
 # aggregate
-re <- ddply(df, c("size", "index"), summarise, N = length(time), mean = mean(time/1000), sd = sd(time/1000), se = sd / sqrt(N) )
+re <- ddply(df, c("size", "index"), summarise, N = length(time), mean = mean(time/1000), sd = sd(time/1000), se = sd / sqrt(N))
+# todo test this
+#re <- summarySE(df, measurevar="time", groupvars=c("size", "index"))
+#re <- na.omit(re)
 # plot                                                                                                                                                             
-ggplot(re, aes(x=size, y=mean, colour=index)) +                                                                                                                
-geom_errorbar(aes(ymin=mean-se, ymax=mean+se), width=.1) +                                                                                               
+ggplot(re, aes(x=size, y=time, colour=index)) +                 
+geom_line() +
+geom_errorbar(aes(ymin=time-se, ymax=time+se), width=.1) +                                                                                               
 geom_point() +                                                                                                                                                 
 scale_y_continuous(name="time (s)") +                                                                                                                          
 scale_x_continuous(name="# of events")                                                                                                                          
@@ -110,8 +159,6 @@ Text representation of the above plot.
 ```{r, echo=FALSE}
 re
 ```
-
-TODO: verify values for import with index (expecially for medium and big)
 
 ## Trace reading
 
@@ -153,18 +200,80 @@ since it is the same.
 ### Analysis
 
 ```{r, echo=FALSE}
-library("data.table")                                                                                                                                              
-library("ggplot2")                                                                                                                                                 
-# create a summary: size, index, mean, error                                                                                                                        
-dt <- data.table(read.csv("../results/reader_first.log"))                                                                                      
-setkey(dt,size,index,param,interval)                                                                                                                                             
-results = dt[,.(imean=mean(interval_time/1000), tmean=mean(total_time/1000), isd=sd(interval_time/1000), tsd=sd(total_time/1000), n=NROW(total_time)), by="size,index,param,interval"]                                                                                       
-res = data.frame(results[,.(size, index, param, interval, imean, ierror=qnorm(0.975)*isd/sqrt(n), tmean, terror = qnorm(0.975)*tsd/sqrt(n))])            
-
-res[c(1,2,3,4,5,7)]
+# utilities
+get_trace <- function(data, s) {
+  df <- data.frame(data)
+  df <- df[df$size==s,]
+  return(df)
+}
 ```
 
-Parse res with python script, to create configuration merging 3 factors (parsed.log).
+
+```{r, echo=FALSE}
+# prepare data summaries
+df <- read.csv("../results/reader_first.log")
+
+# total time summary
+dftime <- summarySE(df, measurevar="total_time", groupvars=c("size", "index", "param", "interval"))
+
+# interval summary (for interval tests)
+dfinterval <- summarySE(df, measurevar="interval_time", groupvars=c("size", "index", "param", "interval"))
+dfinterval <- dfinterval[dfinterval$interval!='0',]
+head(dftime)
+head(dfinterval)
+
+# read all, par, index
+readall <- dftime[dftime$interval=='0',]
+# read nopar, interval, index
+readint <- dftime[dftime$param=='false',]
+
+small_readall <- get_trace(readall, 1000000)
+medium_readall <- get_trace(readall, 10000000)
+big_readall <- get_trace(readall, 100000000)
+small_readint <- get_trace(readint, 1000000)
+medium_readint <- get_trace(readint, 10000000)
+big_readint <- get_trace(readint, 100000000)
+```
+
+#### Total read time, with and without param, with and without index.
+
+Small trace
+
+```{r, echo=FALSE}
+ggplot(data=small_readall, aes(x=index, y=total_time, fill=param)) + geom_bar(stat="identity", position=position_dodge()) +
+geom_errorbar(aes(ymin=total_time-ci, ymax=total_time+ci), width=.1, position=position_dodge(.9)) +
+scale_y_continuous(name="Total time (ms)")  
+```
+
+Medium trace
+
+```{r, echo=FALSE}
+ggplot(data=medium_readall, aes(x=index, y=total_time, fill=param)) + geom_bar(stat="identity", position=position_dodge()) +
+geom_errorbar(aes(ymin=total_time-ci, ymax=total_time+ci), width=.1, position=position_dodge(.9)) +
+scale_y_continuous(name="Total time (ms)")  
+```
+
+Big trace
+
+```{r, echo=FALSE}
+ggplot(data=big_readall, aes(x=index, y=total_time, fill=param)) + geom_bar(stat="identity", position=position_dodge()) +
+geom_errorbar(aes(ymin=total_time-ci, ymax=total_time+ci), width=.1, position=position_dodge(.9)) +
+scale_y_continuous(name="Total time (ms)")  
+```
+
+#### Total read time and interval time, without param, with and without index.
+```{r, echo=FALSE}
+ggplot(data=small_readint, aes(x=interval, y=total_time, fill=index) + 
+geom_bar(stat="identity", position=position_dodge()) +
+geom_errorbar(aes(ymin=total_time-ci, ymax=total_time+ci), width=.1, position=position_dodge(.9)) +
+  scale_y_continuous(name="Total time (ms)")  
+```
+
+#### Total read time, with and without param, with and without index.
+
+### Global analysis (obsolete)
+
+Parse the summary with python script, to create configuration merging 3 factors (the output of parsing is in parsed.log).
 
 ```{r, echo=FALSE}
 df <- data.frame(read.csv("../results/parsed.log"))
