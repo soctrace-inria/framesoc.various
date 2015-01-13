@@ -8,6 +8,11 @@ output:
 ---
 
 ```{r, echo=FALSE}
+## RUN THIS BEFORE ALL
+
+library("plyr")                                                                                                                                              
+library("ggplot2")   
+
 ## Summarizes data.
 ## Gives count, mean, standard deviation, standard error of the mean, and confidence interval (default 95%).
 ##   data: a data frame.
@@ -50,6 +55,14 @@ summarySE <- function(data=NULL, measurevar, groupvars=NULL, na.rm=FALSE,
 
     return(datac)
 }
+
+# utility to get trace data
+get_trace <- function(data, s) {
+  df <- data.frame(data)
+  df <- df[df$size==s,]
+  return(df)
+}
+
 ```
 
 # Intro
@@ -135,9 +148,7 @@ RAM: 16360588 kB
 
 Import time given the number of events and the indexing property.
 
-```{r, echo=FALSE}
-library("plyr")                                                                                                                                              
-library("ggplot2")                                                                                                                                                 
+```{r, echo=FALSE}                                                                                                                                              
 # read data
 df <- read.csv("../results/temictli_bench.log")
 # aggregate
@@ -151,7 +162,7 @@ geom_line() +
 geom_errorbar(aes(ymin=time-se, ymax=time+se), width=.1) +                                                                                               
 geom_point() +                                                                                                                                                 
 scale_y_continuous(name="time (s)") +                                                                                                                          
-scale_x_continuous(name="# of events")                                                                                                                          
+scale_x_continuous(name="# of events")        
 ```
 
 Text representation of the above plot.
@@ -200,12 +211,7 @@ since it is the same.
 ### Analysis
 
 ```{r, echo=FALSE}
-# utilities
-get_trace <- function(data, s) {
-  df <- data.frame(data)
-  df <- df[df$size==s,]
-  return(df)
-}
+
 ```
 
 
