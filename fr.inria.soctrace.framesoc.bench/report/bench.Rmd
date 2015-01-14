@@ -3,8 +3,8 @@ title: "Framesoc Bench"
 author: "Generoso Pagano"
 date: "01/08/2015"
 output:
-  html_document: default
   pdf_document: default
+  html_document: default
 ---
 
 ```{r, echo=FALSE}
@@ -71,7 +71,7 @@ get_trace <- function(data, s) {
 Framesoc infrastructure benchmark, concerning trace import times and event reading times.
 
 ## Vocabulary
-* Parameter: something inuencing the behavior of the system.
+* Parameter: something influencing the behavior of the system.
 * Factor: parameter you decide to variate during experiment.
 * Level: value given to a factor.
 * Metric: what we want to measure
@@ -123,10 +123,10 @@ RAM: 16360588 kB
 
 * Factors: 
     + Trace size: measured in # of events, directly translatable in the DB size (MB)
-    + Indexing: boolean (are we indexing on timestamp or not?)
+    + Indexing: boolean (are we indexing on time stamp or not?)
 * Levels
     + Trace size:
-        - small: 1 Mevent (66.3 MB withoud index, 81.2 MB with index)
+        - small: 1 Mevent (66.3 MB without index, 81.2 MB with index)
         - medium: 10 Mevent (692.6 MB without index, 843.9 MB with index)
         - big: 100 Mevent (7.5 GB without index, 9.3 GB with index)
     + Indexing:
@@ -142,7 +142,7 @@ RAM: 16360588 kB
     + small traces: 30 repetitions
     + medium traces: 10 repetitions
     + big traces: 5 repetitions
-    + NOTE: as we will see below this number of repetition is largely enough to ensure very small confidence indervals.
+    + NOTE: as we will see below this number of repetition is largely enough to ensure very small confidence intervals.
 
 ### Analysis
 
@@ -152,10 +152,7 @@ Import time given the number of events and the indexing property.
 # read data
 df <- read.csv("../results/temictli_bench.log")
 # aggregate
-re <- ddply(df, c("size", "index"), summarise, N = length(time), mean = mean(time/1000), sd = sd(time/1000), se = sd / sqrt(N))
-# todo test this
-#re <- summarySE(df, measurevar="time", groupvars=c("size", "index"))
-#re <- na.omit(re)
+re <- summarySE(df, measurevar="time", groupvars=c("size", "index"))
 # plot                                                                                                                                                             
 ggplot(re, aes(x=size, y=time, colour=index)) +                 
 geom_line() +
@@ -182,7 +179,7 @@ since it is the same.
     + Trace size
     + Indexing
     + Reading parameters: boolean
-    + Reading intervall: the number of events per interval (all events, 100k events, ...)
+    + Reading interval: the number of events per interval (all events, 100k events, ...)
 * Levels
     + Trace size:
         - small
@@ -192,56 +189,71 @@ since it is the same.
         - true
         - false
     + Interval
-        - all events
-        - 100k events (choosen as best compromise between speed and ui interactivity)
+        - all events, labelled as interval=0 (only small and medium traces)
+        - 100k events, labelled as interval=100000 (chosen as best compromise between speed and UI interactivity)
 * Metric:
     + Total read time
     + Interval read time
-    + Max used memory
 * Other parameters: 
     + fake traces created above
     + the program used for reading (fr.inria.soctrace.framesoc.bench) is available on github:
     (https://github.com/soctrace-inria/framesoc.various)
 * Experiments:
-    + small traces: 30 repetitions
-    + medium traces: 10 repetitions
-    + big traces: 5 repetitions
-    + TODO NOTE: as we will see below this number of repetition is largely enough to ensure very small confidence indervals.
+    + small traces: 30+ repetitions
+    + medium traces: 10+ repetitions
+    + big traces: only partial execution, to have the time to read an interval. No tests without interval (all events) because of memory limits.
+    + NOTE: as we will see below this number of repetition is largely enough to ensure very small confidence intervals.
 
 ### Analysis
 
 ```{r, echo=FALSE}
-
-```
-
-
-```{r, echo=FALSE}
 # prepare data summaries
-df <- read.csv("../results/reader_first.log")
+df <- read.csv("../results/reader_second.log")
 
 # total time summary
 dftime <- summarySE(df, measurevar="total_time", groupvars=c("size", "index", "param", "interval"))
 
-# interval summary (for interval tests)
+# interval summary
 dfinterval <- summarySE(df, measurevar="interval_time", groupvars=c("size", "index", "param", "interval"))
-dfinterval <- dfinterval[dfinterval$interval!='0',]
-head(dftime)
-head(dfinterval)
 
 # read all, par, index
 readall <- dftime[dftime$interval=='0',]
+# read interval, par, index
+readint <- dftime[dftime$interval=='100000',]
 # read nopar, interval, index
-readint <- dftime[dftime$param=='false',]
+readnopar <- dftime[dftime$param=='false',]
+intervalnopar <- dfinterval[dfinterval$param=='false',]
 
 small_readall <- get_trace(readall, 1000000)
 medium_readall <- get_trace(readall, 10000000)
 big_readall <- get_trace(readall, 100000000)
+
 small_readint <- get_trace(readint, 1000000)
 medium_readint <- get_trace(readint, 10000000)
 big_readint <- get_trace(readint, 100000000)
+
+small_readnopar <- get_trace(readnopar, 1000000)
+medium_readnopar <- get_trace(readnopar, 10000000)
+big_readnopar <- get_trace(readnopar, 100000000)
+
+small_intervalnopar <- get_trace(intervalnopar, 1000000)
+medium_intervalnopar <- get_trace(intervalnopar, 10000000)
+big_intervalnopar <- get_trace(intervalnopar, 100000000)
 ```
 
-#### Total read time, with and without param, with and without index.
+#### Summarized values
+
+##### Total time
+```{r, echo=FALSE}
+dftime[c(1,2,3,4,6)]
+```
+
+##### Interval time
+```{r, echo=FALSE}
+dfinterval[c(1,2,3,4,6)]
+```
+
+#### Total read time (no interval reading), with and without param, with and without index.
 
 Small trace
 
@@ -261,29 +273,121 @@ scale_y_continuous(name="Total time (ms)")
 
 Big trace
 
+Without interval (reading all), giving 10 GB of heap space to eclipse, it was impossible to run these tests
+
+Got the following `OutOfMemoryError` error: 
+      ```
+      !ENTRY org.eclipse.core.jobs 4 2 2015-01-14 15:41:18.088
+      !MESSAGE An internal error occurred during: "Framesoc Reader".
+      !STACK 0
+      java.lang.OutOfMemoryError: GC overhead limit exceeded
+        at java.util.ArrayList.<init>(ArrayList.java:132)
+        at java.util.ArrayList.<init>(ArrayList.java:139)
+        at fr.inria.soctrace.lib.model.Event.<init>(Event.java:122)
+      	at fr.inria.soctrace.lib.model.State.<init>(State.java:24)
+      	at fr.inria.soctrace.lib.model.Event.createCategorizedEvent(Event.java:108)
+      	at fr.inria.soctrace.lib.query.EventQuery.rebuildEvent(EventQuery.java:395)
+      	at fr.inria.soctrace.lib.query.EventQuery.rebuildEvents(EventQuery.java:357)
+      	at fr.inria.soctrace.lib.query.EventQuery.getList(EventQuery.java:208)
+      	at fr.inria.soctrace.framesoc.bench.reading.FramesocReader.readAll(FramesocReader.java:166)
+      	at fr.inria.soctrace.framesoc.bench.reading.FramesocReader.doExperiment(FramesocReader.java:147)
+      	at fr.inria.soctrace.framesoc.bench.reading.FramesocReader.main(FramesocReader.java:131)
+      	at fr.inria.soctrace.framesoc.bench.reading.FramesocReaderTool$1.run(FramesocReaderTool.java:20)
+      	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:53)
+      ```
+
+
+#### Total read time (interval reading), with and without param, with and without index.
+
+Small trace
+
 ```{r, echo=FALSE}
-ggplot(data=big_readall, aes(x=index, y=total_time, fill=param)) + geom_bar(stat="identity", position=position_dodge()) +
+ggplot(data=small_readint, aes(x=index, y=total_time, fill=param)) + geom_bar(stat="identity", position=position_dodge()) +
 geom_errorbar(aes(ymin=total_time-ci, ymax=total_time+ci), width=.1, position=position_dodge(.9)) +
 scale_y_continuous(name="Total time (ms)")  
 ```
 
-#### Total read time and interval time, without param, with and without index.
+Medium trace
+
 ```{r, echo=FALSE}
-ggplot(data=small_readint, aes(x=interval, y=total_time, fill=index) + 
-geom_bar(stat="identity", position=position_dodge()) +
+ggplot(data=medium_readint, aes(x=index, y=total_time, fill=param)) + geom_bar(stat="identity", position=position_dodge()) +
 geom_errorbar(aes(ymin=total_time-ci, ymax=total_time+ci), width=.1, position=position_dodge(.9)) +
-  scale_y_continuous(name="Total time (ms)")  
+scale_y_continuous(name="Total time (ms)")  
 ```
 
-#### Total read time, with and without param, with and without index.
+Big trace
 
-### Global analysis (obsolete)
+- with interval
+    - with index
+        - with param, reading an interval is about 139 seconds, for the whole trace it would take 38 hours (TABLE)
+        - without param, reading an interval is 250 milliseconds, so 4 minutes for the whole trace (GANTT)
+    - without index
+        - with param, reading an interval is about 172 seconds, 47 h for the trace
+        - without param, 61 seconds for an interval, 16 hours for the trace
+        
+    - NOTE: using param is SO long because there is no index on the EVENT_ID of EVENT_PARAM table. See conclusions.
 
-Parse the summary with python script, to create configuration merging 3 factors (the output of parsing is in parsed.log).
+#### Total read time and interval time, without param, with and without index.
+
+Small trace
 
 ```{r, echo=FALSE}
-df <- data.frame(read.csv("../results/parsed.log"))
-small <- df[df$size=='1000000',]
-# plot                                                                                                                                                             
-ggplot(data=small, aes(x=size, y=tmean, fill=config)) + geom_bar(stat="identity", position=position_dodge())                                                                                                                     
+ggplot(data=small_readnopar, aes(x=index, y=total_time, fill=factor(interval)))  + 
+         geom_bar(stat="identity", position=position_dodge()) + 
+         geom_errorbar(aes(ymin=total_time-ci, ymax=total_time+ci), width=.1, position=position_dodge(.9)) + 
+         scale_y_continuous(name="Total time (ms)")  
 ```
+
+Average time to start getting results (get an interval in the interval case)
+
+```{r, echo=FALSE}
+ggplot(data=small_intervalnopar, aes(x=index, y=interval_time, fill=factor(interval)))  + 
+         geom_bar(stat="identity", position=position_dodge()) + 
+         geom_errorbar(aes(ymin=interval_time-ci, ymax=interval_time+ci), width=.1, position=position_dodge(.9)) + 
+         scale_y_continuous(name="Total time (ms)")  
+```
+
+Medium trace
+
+```{r, echo=FALSE}
+ggplot(data=medium_readnopar, aes(x=index, y=total_time, fill=factor(interval)))  + 
+         geom_bar(stat="identity", position=position_dodge()) + 
+         geom_errorbar(aes(ymin=total_time-ci, ymax=total_time+ci), width=.1, position=position_dodge(.9)) + 
+         scale_y_continuous(name="Total time (ms)")  
+```
+
+Average time to start getting results (get an interval in the interval case)
+
+```{r, echo=FALSE}
+ggplot(data=medium_intervalnopar, aes(x=index, y=interval_time, fill=factor(interval)))  + 
+         geom_bar(stat="identity", position=position_dodge()) + 
+         geom_errorbar(aes(ymin=interval_time-ci, ymax=interval_time+ci), width=.1, position=position_dodge(.9)) + 
+         scale_y_continuous(name="Total time (ms)")  
+```
+
+
+Big trace
+
+- read all (interval==0): no data because of memory limits.
+- with interval
+    - with index
+        - without param, reading an interval is ~240 milliseconds, so about 4 minutes for the whole trace (GANTT)
+    - without index
+        - without param, 61 seconds for an interval, 16 hours for the trace
+
+#### Conclusion
+
+- Having parameters (without an index on event_id in the EVENT_PARAM table) kills performance in reading.
+  This is because, even if we have a temporal index to load events, we still have to search THE WHOLE EVENT_PARAM
+  table to link the params to the events. For this reason an index on the event_id field of this table would solve
+  the issue. However, the only use-case where parameters are loaded is the table and this kind of visualization is
+  NOT intended to be used for the WHOLE trace, but only on small subsets (after analyzing with the gantt for example).
+  For this reason we don't have by default this index. 
+  It could be a possibility to add it.
+  TODO: measure the impact on import time.
+  
+- Having an index on the timestamp makes sense only for interval reading. If we read all, it has no effect on reading.
+  As the trace size increases, it becames absolutely necessary. 
+  For example: reading the big trace using intervals and not loading parameters (GANTT) would take about 16 hours without index and only 4 minutes with the index. 
+
+- Interval reading ([with index, without parameters] == gantt) increments total time by a factor from 3 to 2 (decreasing as the trace size increase), but we can have a first meaningful feedback in about 250 ms (first interval). Note that for big traces interval reading is compulsory, since we are limited by the memory.

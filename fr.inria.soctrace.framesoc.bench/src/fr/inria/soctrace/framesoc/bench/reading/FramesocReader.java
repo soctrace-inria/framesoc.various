@@ -239,6 +239,7 @@ public class FramesocReader {
 					// not last interval
 					intervals.add(dm.getDelta());
 				}
+				//System.out.println(dm.getDelta());
 			}
 			Assert.isTrue(ev == line.events);
 		} finally {
