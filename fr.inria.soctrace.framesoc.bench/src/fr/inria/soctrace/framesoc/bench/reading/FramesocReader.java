@@ -87,12 +87,12 @@ public class FramesocReader {
 
 		@Override
 		public String toString() {
-			return size + ", " + index + ", " + param + ", " + interval + ", " + intervalTime
-					+ ", " + totalTime;
+			return size + "," + index + "," + param + "," + interval + "," + intervalTime
+					+ "," + totalTime;
 		}
 
 		public static String getHeader() {
-			return "size, index, param, interval, interval_time, total_time";
+			return "size,index,param,interval,interval_time,total_time";
 		}
 	}
 
