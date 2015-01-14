@@ -22,14 +22,13 @@ public class FramesocReaderConfig {
 		public final static String SEPARATOR = "\\s+";
 		public String dbName;
 		public long events;
-		public boolean index;
-		public boolean eindex;
+		public String index;
 		public int runs;
 
 		@Override
 		public String toString() {
 			return "ConfigLine [dbName=" + dbName + ", events=" + events + ", index=" + index
-					+ ", eindex=" + eindex + ", runs=" + runs + "]";
+					+ ", runs=" + runs + "]";
 		}
 	}
 
@@ -135,9 +134,8 @@ public class FramesocReaderConfig {
 				ConfigLine l = new ConfigLine();
 				l.dbName = tokens[0];
 				l.events = Long.valueOf(tokens[1]);
-				l.index = Boolean.valueOf(tokens[2]);
-				l.eindex = Boolean.valueOf(tokens[3]);
-				l.runs = Integer.valueOf(tokens[4]);
+				l.index = tokens[2];
+				l.runs = Integer.valueOf(tokens[3]);
 				lines.add(l);
 			}
 

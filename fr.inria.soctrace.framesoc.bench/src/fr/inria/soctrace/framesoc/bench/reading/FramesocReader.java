@@ -74,8 +74,7 @@ public class FramesocReader {
 
 	private static final class ReaderOutput {
 		public long size;
-		public boolean index;
-		public boolean eindex;
+		public String index;
 		public boolean param;
 		public int interval;
 		public long intervalTime;
@@ -84,17 +83,16 @@ public class FramesocReader {
 		public ReaderOutput(ConfigLine line) {
 			size = line.events;
 			index = line.index;
-			eindex = line.eindex;
 		}
 
 		@Override
 		public String toString() {
-			return size + "," + index + "," + eindex + "," + param + "," + interval + "," + intervalTime
+			return size + "," + index + "," + param + "," + interval + "," + intervalTime
 					+ "," + totalTime;
 		}
 
 		public static String getHeader() {
-			return "size,index,eindex,param,interval,interval_time,total_time";
+			return "size,index,param,interval,interval_time,total_time";
 		}
 	}
 

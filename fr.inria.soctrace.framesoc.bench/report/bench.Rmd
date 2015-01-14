@@ -168,6 +168,51 @@ Text representation of the above plot.
 re
 ```
 
+
+## Trace import with index on event id (EVENT_PARAM table)
+
+As above, but adding the factor of indexing or not the event id on EVENT_PARAM table.
+
+### Analysis
+
+Import time given the number of events and the indexing property.
+
+```{r, echo=FALSE}                                                                                                                                              
+# read data
+eindex <- read.csv("../results/temictli_eindex.log")
+# replaces levels in the order, performing the substitutions
+# levels(eindex$index) is "false" "true" 
+# so all true will be assigned with both and all false with none
+# the assignment eindex$index[eindex$index=="true"] <- "both" is not necessary
+levels(eindex$index) <- c("none", "both", "time")
+
+old <- read.csv("../results/temictli_bench.log")
+levels(old$index) <- c("none", "time", "both")
+#old$index[old$index=="false"] <- "none"
+#old$index[old$index=="true"] <- "time"
+head(old)
+
+# bind two data frames
+all <- rbind(old, eindex)
+
+# aggregate
+re <- summarySE(all, measurevar="time", groupvars=c("size", "index"))
+
+# plot                                                                                                                                                             
+ggplot(re, aes(x=size, y=time, colour=index)) +                 
+geom_line() +
+geom_errorbar(aes(ymin=time-se, ymax=time+se), width=.1) +                                                                                               
+geom_point() +                                                                                                                                                 
+scale_y_continuous(name="time (s)") +                                                                                                                          
+scale_x_continuous(name="# of events")        
+```
+
+Text representation of the above plot.
+
+```{r, echo=FALSE}
+re
+```
+
 ## Trace reading
 
 ### Description
