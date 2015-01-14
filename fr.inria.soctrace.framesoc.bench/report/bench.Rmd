@@ -123,15 +123,16 @@ RAM: 16360588 kB
 
 * Factors: 
     + Trace size: measured in # of events, directly translatable in the DB size (MB)
-    + Indexing: boolean (are we indexing on time stamp or not?)
+    + Indexing: type of indexing (see levels)
 * Levels
     + Trace size:
         - small: 1 Mevent (66.3 MB without index, 81.2 MB with index)
         - medium: 10 Mevent (692.6 MB without index, 843.9 MB with index)
         - big: 100 Mevent (7.5 GB without index, 9.3 GB with index)
     + Indexing:
-        - true
-        - false
+        - none
+        - time
+        - both: time and event id on event param table
 * Metric:
     + Import time
 * Other parameters: 
@@ -150,47 +151,17 @@ Import time given the number of events and the indexing property.
 
 ```{r, echo=FALSE}                                                                                                                                              
 # read data
-df <- read.csv("../results/temictli_bench.log")
-# aggregate
-re <- summarySE(df, measurevar="time", groupvars=c("size", "index"))
-# plot                                                                                                                                                             
-ggplot(re, aes(x=size, y=time, colour=index)) +                 
-geom_line() +
-geom_errorbar(aes(ymin=time-se, ymax=time+se), width=.1) +                                                                                               
-geom_point() +                                                                                                                                                 
-scale_y_continuous(name="time (s)") +                                                                                                                          
-scale_x_continuous(name="# of events")        
-```
-
-Text representation of the above plot.
-
-```{r, echo=FALSE}
-re
-```
-
-
-## Trace import with index on event id (EVENT_PARAM table)
-
-As above, but adding the factor of indexing or not the event id on EVENT_PARAM table.
-
-### Analysis
-
-Import time given the number of events and the indexing property.
-
-```{r, echo=FALSE}                                                                                                                                              
-# read data
 eindex <- read.csv("../results/temictli_eindex.log")
-# replaces levels in the order, performing the substitutions
-# levels(eindex$index) is "false" "true" 
-# so all true will be assigned with both and all false with none
-# the assignment eindex$index[eindex$index=="true"] <- "both" is not necessary
-levels(eindex$index) <- c("none", "both", "time")
+levels(eindex$index) <- c("both", "time", "none")
 
 old <- read.csv("../results/temictli_bench.log")
-levels(old$index) <- c("none", "time", "both")
+# replaces levels in the order, performing the substitutions
+# levels(old$index) is "false" "true" 
+# so all true will be assigned with both and all false with none
+# the assignment below are not necessary
 #old$index[old$index=="false"] <- "none"
 #old$index[old$index=="true"] <- "time"
-head(old)
+levels(old$index) <- c("none", "time", "both")
 
 # bind two data frames
 all <- rbind(old, eindex)
@@ -223,14 +194,18 @@ since it is the same.
 * Factors: 
     + Trace size
     + Indexing
-    + Reading parameters: boolean
+    + Param (Reading parameters): boolean
     + Reading interval: the number of events per interval (all events, 100k events, ...)
 * Levels
     + Trace size:
         - small
         - medium
         - big
-    + Indexing and Reading parameters:
+    + Indexing
+        - none
+        - time
+        - both: time and event id in event param table
+    + Param: 
         - true
         - false
     + Interval
@@ -253,13 +228,20 @@ since it is the same.
 
 ```{r, echo=FALSE}
 # prepare data summaries
-df <- read.csv("../results/reader_second.log")
+
+# merge old and new data
+eindex <- read.csv("../results/reader_eindex.log")
+levels(eindex$index) <- c("both", "time", "none")
+old <- read.csv("../results/reader_second.log")
+levels(old$index) <- c("none", "time")
+# bind two data frames
+all <- rbind(old, eindex)
 
 # total time summary
-dftime <- summarySE(df, measurevar="total_time", groupvars=c("size", "index", "param", "interval"))
+dftime <- summarySE(all, measurevar="total_time", groupvars=c("size", "index", "param", "interval"))
 
 # interval summary
-dfinterval <- summarySE(df, measurevar="interval_time", groupvars=c("size", "index", "param", "interval"))
+dfinterval <- summarySE(all, measurevar="interval_time", groupvars=c("size", "index", "param", "interval"))
 
 # read all, par, index
 readall <- dftime[dftime$interval=='0',]
@@ -363,15 +345,19 @@ scale_y_continuous(name="Total time (ms)")
 Big trace
 
 - with interval
-    - with index
-        - with param, reading an interval is about 139 seconds, for the whole trace it would take 38 hours (TABLE)
-        - without param, reading an interval is 250 milliseconds, so 4 minutes for the whole trace (GANTT)
-    - without index
+    - without time index
         - with param, reading an interval is about 172 seconds, 47 h for the trace
         - without param, 61 seconds for an interval, 16 hours for the trace
-        
-    - NOTE: using param is SO long because there is no index on the EVENT_ID of EVENT_PARAM table. See conclusions.
 
+    - with time index
+        - with param, reading an interval is about 139 seconds, for the whole trace it would take 38 hours (TABLE)
+        - without param, reading an interval is 250 milliseconds, so 4 minutes for the whole trace (GANTT)
+        - NOTE: using param is SO long because there is no index on the EVENT_ID of EVENT_PARAM table. See conclusions.    
+        
+    - with both indexes
+        - without param is as above (GANTT)
+        - with param, reading an interval is XXXX, so XXX for the whole trace (TABLE)
+        
 #### Total read time and interval time, without param, with and without index.
 
 Small trace
