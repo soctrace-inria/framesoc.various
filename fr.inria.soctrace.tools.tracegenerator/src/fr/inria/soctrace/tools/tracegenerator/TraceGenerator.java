@@ -306,7 +306,10 @@ public class TraceGenerator {
 		}
 
 		if (forceIndex) {
+			monitor.subTask("Indexing timestamp");
 			traceDB.createTimestampIndex();
+			monitor.subTask("Indexing event id in EVENT_PARAM");
+			traceDB.createEventParamIndex();
 		}
 		traceDB.close();
 
