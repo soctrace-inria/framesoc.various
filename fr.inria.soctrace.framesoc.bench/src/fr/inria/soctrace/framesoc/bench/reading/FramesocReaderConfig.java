@@ -23,12 +23,13 @@ public class FramesocReaderConfig {
 		public String dbName;
 		public long events;
 		public boolean index;
+		public boolean eindex;
 		public int runs;
 
 		@Override
 		public String toString() {
 			return "ConfigLine [dbName=" + dbName + ", events=" + events + ", index=" + index
-					+ ", runs=" + runs + "]";
+					+ ", eindex=" + eindex + ", runs=" + runs + "]";
 		}
 	}
 
@@ -135,7 +136,8 @@ public class FramesocReaderConfig {
 				l.dbName = tokens[0];
 				l.events = Long.valueOf(tokens[1]);
 				l.index = Boolean.valueOf(tokens[2]);
-				l.runs = Integer.valueOf(tokens[3]);
+				l.eindex = Boolean.valueOf(tokens[3]);
+				l.runs = Integer.valueOf(tokens[4]);
 				lines.add(l);
 			}
 

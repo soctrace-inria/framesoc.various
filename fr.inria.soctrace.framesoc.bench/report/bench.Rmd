@@ -3,8 +3,8 @@ title: "Framesoc Bench"
 author: "Generoso Pagano"
 date: "01/08/2015"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 ---
 
 ```{r, echo=FALSE}
