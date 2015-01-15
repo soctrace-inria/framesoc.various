@@ -190,6 +190,7 @@ public class TraceGenerator {
 	List<EventType> typesList = new ArrayList<EventType>();
 	long numberOfGeneratedEvents;
 	long maxTimeStamp;
+	TraceDBObject traceDB;
 
 	/*
 	 * Short-cuts
@@ -200,8 +201,6 @@ public class TraceGenerator {
 	// TraceGenerator.TRACE_TYPE_ID;
 	// public int NUMBER_OF_PARAMETER_TYPES = NUMBER_OF_CATEGORIES *
 	// numberOfEventType * NUMBER_OF_PARAMETERS;
-	// public int TOTAL_NUMBER_OF_EVENTS = numberOfProducers * numberOfEventType
-	// * numberOfTypes * NUMBER_OF_CATEGORIES;
 
 	public int getEventsPerCategory() {
 		// if (NUMBER_OF_CATEGORIES == 0)
@@ -211,16 +210,10 @@ public class TraceGenerator {
 
 	public long getNumberOfEvents(int category) {
 		return numberOfEvents;
-		// return getEventsPerCategory() * (categories.contains(category) ? 1 :
-		// 0);
 	}
 
 	public long getMaxTimestamp() {
-		long punctuals = getNumberOfEvents(EventCategory.PUNCTUAL_EVENT)
-				+ getNumberOfEvents(EventCategory.VARIABLE);
-		long nonpunctuals = getNumberOfEvents(EventCategory.STATE)
-				+ getNumberOfEvents(EventCategory.LINK);
-		return MIN_TIMESTAMP + punctuals + nonpunctuals * (MAX_DURATION + 1) - 1;
+		return maxTimeStamp;
 	}
 
 	/**
@@ -242,7 +235,7 @@ public class TraceGenerator {
 		/*
 		 * Trace events
 		 */
-		TraceDBObject traceDB = new TraceDBObject(dbName, DBMode.DB_CREATE);
+		traceDB = new TraceDBObject(dbName, DBMode.DB_CREATE);
 
 		// Init ID managers
 		IdManager eIdManager = new IdManager();
@@ -252,8 +245,6 @@ public class TraceGenerator {
 		IdManager tpIdManager = new IdManager();
 		IdManager tptIdManager = new IdManager();
 		IdManager producerIdManager = new IdManager();
-
-
 
 		Random rand = new Random();
 
@@ -269,19 +260,22 @@ public class TraceGenerator {
 		}
 
 		monitor.subTask("Generating event producer");
+		// Set root producer with the ID: -1
 		EventProducer root = createEventProd(-1, producerIdManager, traceDB);
 		
-		// Create non-leave producer
+		// Create non-leave producers
 		for (i = 0; i < numberOfProducers - numberOfLeaves; i++) {
 			createEventProd(root.getId(), producerIdManager, traceDB);
 		}
 
 		int potentialParentsSize = producers.size();
+		
 		// Create leave producers
 		for (i = 0; i < numberOfLeaves; i++) {
-			// Randomize parent ID among producers
-			int parentId = producers.get(rand.nextInt(potentialParentsSize))
-					.getId();
+			// Randomize parent ID among producers (avoid to set root as
+			// parent)
+			int parentId = producers.get(
+					rand.nextInt(potentialParentsSize - 1) + 1).getId();
 
 			leaves.add(createEventProd(parentId, producerIdManager, traceDB));
 		}
@@ -290,7 +284,7 @@ public class TraceGenerator {
 
 		monitor.subTask("Generating events");
 		// Create events
-		createEvent(traceDB, producers, leaves, eIdManager, epIdManager, monitor);
+		createEvent(eIdManager, epIdManager, monitor);
 
 		if (monitor.isCanceled()) {
 			traceDB.dropDatabase();
@@ -363,10 +357,10 @@ public class TraceGenerator {
 
 		// If the trace type exist already
 		if (sysDB.isTraceTypePresent(TRACE_TYPE)) {
-			logger.debug("Tracetype exists");
+			logger.debug("Tracetype exists.");
 			return sysDB.getTraceType(TRACE_TYPE);
 		} else {
-			logger.debug("Tracetype does not exist");
+			logger.debug("Tracetype does not exist.");
 			TraceType traceType = new TraceType(sysDB.getNewId(FramesocTable.TRACE_TYPE.toString(),
 					"ID"));
 			traceType.setName(TRACE_TYPE);
@@ -375,9 +369,7 @@ public class TraceGenerator {
 		}
 	}
 
-	private void createEvent(TraceDBObject traceDB,
-			List<EventProducer> producers, List<EventProducer> leaves,
-			IdManager eIdManager, IdManager epIdManager,
+	private void createEvent(IdManager eIdManager, IdManager epIdManager,
 			IProgressMonitor monitor) throws SoCTraceException {
 		int i;
 		Random rand = new Random();
@@ -399,19 +391,8 @@ public class TraceGenerator {
 
 			// Create "number of events / number of active producers" events
 			for (i = 0; i < numberOfEvents / eventProducers.size(); i++) {
-
-				Event e = createAnEvent(i, eProd, eIdManager, rand);
-
-				for (EventParamType ept : e.getType().getEventParamTypes()) {
-					EventParam ep = new EventParam(epIdManager.getNextId());
-					ep.setEvent(e);
-					ep.setEventParamType(ept);
-					ep.setValue(PARAMETER_VALUE);
-					traceDB.save(ep);
-				}
-
-				traceDB.save(e);
-				numberOfGeneratedEvents++;
+				createAnEvent(i, eProd, eIdManager, epIdManager, rand);
+				
 				if (numberOfGeneratedEvents % Temictli.NumberOfEventInCommit == 0) {
 					if (monitor.isCanceled()) {
 						return;
@@ -423,24 +404,14 @@ public class TraceGenerator {
 			}
 		}
 
-		// Since we performed a division the exact number of events might not
-		// have been generated so generate new events
+		// Since we performed a division, the exact number of events might not
+		// have been generated so generate additional events
 		long additionalEvents = numberOfEvents
 				- (numberOfEvents / eventProducers.size() * eventProducers
 						.size());
 		for (i = 0; i < additionalEvents; i++) {
-			Event e = createAnEvent(i, eventProducers.get(i), eIdManager, rand);
+			createAnEvent(i, eventProducers.get(i), eIdManager, epIdManager, rand);
 
-			for (EventParamType ept : e.getType().getEventParamTypes()) {
-				EventParam ep = new EventParam(epIdManager.getNextId());
-				ep.setEvent(e);
-				ep.setEventParamType(ept);
-				ep.setValue(PARAMETER_VALUE);
-				traceDB.save(ep);
-			}
-
-			traceDB.save(e);
-			numberOfGeneratedEvents++;
 			if (numberOfGeneratedEvents % Temictli.NumberOfEventInCommit == 0) {
 				if (monitor.isCanceled()) {
 					return;
@@ -452,8 +423,23 @@ public class TraceGenerator {
 		}
 	}
 	
+	/**
+	 * Generate a new event and save it
+	 * 
+	 * @param cpt
+	 *            the event counter for the current event producer
+	 * @param eProd
+	 *            the event producer of the event
+	 * @param eIdManager
+	 *            the ID manager for the event
+	 * @param rand
+	 *            random number generator
+	 * @return the generated event
+	 * @throws SoCTraceException
+	 */
 	public Event createAnEvent(int cpt, EventProducer eProd,
-			IdManager eIdManager, Random rand) throws SoCTraceException {
+			IdManager eIdManager, IdManager epIdManager, Random rand)
+			throws SoCTraceException {
 		// Randomize event type
 		int type = rand.nextInt(typesList.size());
 		EventType et = typesList.get(type);
@@ -510,7 +496,17 @@ public class TraceGenerator {
 		e.setEventProducer(eProd);
 		e.setCpu(CPU);
 		e.setPage(PAGE);
+		
+		for (EventParamType ept : e.getType().getEventParamTypes()) {
+			EventParam ep = new EventParam(epIdManager.getNextId());
+			ep.setEvent(e);
+			ep.setEventParamType(ept);
+			ep.setValue(PARAMETER_VALUE);
+			traceDB.save(ep);
+		}
 
+		traceDB.save(e);
+		numberOfGeneratedEvents++;
 		return e;
 	}
 	
