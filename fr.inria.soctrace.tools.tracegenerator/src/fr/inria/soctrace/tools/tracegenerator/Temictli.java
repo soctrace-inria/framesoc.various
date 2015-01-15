@@ -149,8 +149,8 @@ public class Temictli extends FramesocTool {
 						aGenerator.generateTrace(monitor);
 						dm.end();
 						if (PRINT_TIME) {
-							System.out.println(aConfig.getNumberOfEvents() + ", "
-									+ aConfig.isForceIndex() + ", " + dm.getDelta());
+							System.out.println(aConfig.getNumberOfEvents() + ","
+									+ aConfig.isForceIndex() + "," + dm.getDelta());
 						}
 					}
 				}

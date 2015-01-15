@@ -126,7 +126,7 @@ public class FramesocReader {
 		for (ConfigLine line : lines) {
 			for (Boolean param : params) {
 				for (Integer interval : intervals) {
-					//System.out.println(line + ", " + param + ", " + interval);
+					//System.out.println(line + "," + param + "," + interval);
 					try {
 						doExperiment(line, param, interval);
 					} catch (SoCTraceException e) {
