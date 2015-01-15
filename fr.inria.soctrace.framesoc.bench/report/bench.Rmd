@@ -174,7 +174,7 @@ ggplot(re, aes(x=size, y=time, colour=index)) +
 geom_line() +
 geom_errorbar(aes(ymin=time-se, ymax=time+se), width=.1) +                                                                                               
 geom_point() +                                                                                                                                                 
-scale_y_continuous(name="time (s)") +                                                                                                                          
+scale_y_continuous(name="time (ms)") +                                                                                                                          
 scale_x_continuous(name="# of events")        
 ```
 
@@ -247,6 +247,7 @@ dfinterval <- summarySE(all, measurevar="interval_time", groupvars=c("size", "in
 readall <- dftime[dftime$interval=='0',]
 # read interval, par, index
 readint <- dftime[dftime$interval=='100000',]
+intervalreadpar <- dfinterval[dfinterval$param=='true',]
 # read nopar, interval, index
 readnopar <- dftime[dftime$param=='false',]
 intervalnopar <- dfinterval[dfinterval$param=='false',]
@@ -266,6 +267,11 @@ big_readnopar <- get_trace(readnopar, 100000000)
 small_intervalnopar <- get_trace(intervalnopar, 1000000)
 medium_intervalnopar <- get_trace(intervalnopar, 10000000)
 big_intervalnopar <- get_trace(intervalnopar, 100000000)
+
+small_intervalpar <- get_trace(intervalreadpar, 1000000)
+medium_intervalpar <- get_trace(intervalreadpar, 10000000)
+big_intervalpar <- get_trace(intervalreadpar, 100000000)
+
 ```
 
 #### Summarized values
@@ -323,7 +329,6 @@ Got the following `OutOfMemoryError` error:
       	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:53)
       ```
 
-
 #### Total read time (interval reading), with and without param, with and without index.
 
 Small trace
@@ -334,12 +339,30 @@ geom_errorbar(aes(ymin=total_time-ci, ymax=total_time+ci), width=.1, position=po
 scale_y_continuous(name="Total time (ms)")  
 ```
 
+Average time to start getting results (get an interval in the interval case)
+
+```{r, echo=FALSE}
+ggplot(data=small_intervalpar, aes(x=index, y=interval_time, fill=factor(interval)))  + 
+         geom_bar(stat="identity", position=position_dodge()) + 
+         geom_errorbar(aes(ymin=interval_time-ci, ymax=interval_time+ci), width=.1, position=position_dodge(.9)) + 
+         scale_y_continuous(name="Total time (ms)")  
+```
+
 Medium trace
 
 ```{r, echo=FALSE}
 ggplot(data=medium_readint, aes(x=index, y=total_time, fill=param)) + geom_bar(stat="identity", position=position_dodge()) +
 geom_errorbar(aes(ymin=total_time-ci, ymax=total_time+ci), width=.1, position=position_dodge(.9)) +
 scale_y_continuous(name="Total time (ms)")  
+```
+
+Average time to start getting results (get an interval in the interval case)
+
+```{r, echo=FALSE}
+ggplot(data=medium_intervalpar, aes(x=index, y=interval_time, fill=factor(interval)))  + 
+         geom_bar(stat="identity", position=position_dodge()) + 
+         geom_errorbar(aes(ymin=interval_time-ci, ymax=interval_time+ci), width=.1, position=position_dodge(.9)) + 
+         scale_y_continuous(name="Total time (ms)")  
 ```
 
 Big trace
@@ -395,7 +418,6 @@ ggplot(data=medium_intervalnopar, aes(x=index, y=interval_time, fill=factor(inte
          geom_errorbar(aes(ymin=interval_time-ci, ymax=interval_time+ci), width=.1, position=position_dodge(.9)) + 
          scale_y_continuous(name="Total time (ms)")  
 ```
-
 
 Big trace
 
