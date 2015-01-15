@@ -15,6 +15,7 @@ Require-Bundle: org.eclipse.ui,
  fr.inria.soctrace.framesoc.core;bundle-version="1.0.1"
 Bundle-RequiredExecutionEnvironment: JavaSE-1.7
 Bundle-ActivationPolicy: lazy
-Import-Package: fr.inria.soctrace.lib.storage,
+Import-Package: fr.inria.soctrace.framesoc.ui.loaders,
+ fr.inria.soctrace.lib.storage,
  fr.inria.soctrace.lib.utils,
  org.slf4j

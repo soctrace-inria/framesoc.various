@@ -3,4 +3,6 @@
 /bin
 /doc
 *~
+.RData
+.Rhistory
 

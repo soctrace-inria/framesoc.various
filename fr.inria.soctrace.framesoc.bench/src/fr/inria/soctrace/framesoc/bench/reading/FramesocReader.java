@@ -4,14 +4,26 @@
 package fr.inria.soctrace.framesoc.bench.reading;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.eclipse.core.runtime.Assert;
 
 import fr.inria.soctrace.framesoc.bench.reading.FramesocReaderConfig.ConfigLine;
+import fr.inria.soctrace.framesoc.ui.loaders.LoaderUtils;
 import fr.inria.soctrace.lib.model.Event;
+import fr.inria.soctrace.lib.model.Trace;
 import fr.inria.soctrace.lib.model.utils.SoCTraceException;
 import fr.inria.soctrace.lib.query.EventQuery;
+import fr.inria.soctrace.lib.query.conditions.LogicalCondition;
+import fr.inria.soctrace.lib.query.conditions.SimpleCondition;
+import fr.inria.soctrace.lib.query.conditions.ConditionsConstants.ComparisonOperation;
+import fr.inria.soctrace.lib.query.conditions.ConditionsConstants.LogicalOperation;
+import fr.inria.soctrace.lib.search.ITraceSearch;
+import fr.inria.soctrace.lib.search.TraceSearch;
+import fr.inria.soctrace.lib.storage.DBObject;
 import fr.inria.soctrace.lib.storage.TraceDBObject;
 import fr.inria.soctrace.lib.utils.DeltaManager;
 
@@ -58,11 +70,13 @@ import fr.inria.soctrace.lib.utils.DeltaManager;
  */
 public class FramesocReader {
 
+	private static Map<String, Trace> traces;
+
 	private static final class ReaderOutput {
 		public long size;
-		public boolean index;
+		public String index;
 		public boolean param;
-		public long interval;
+		public int interval;
 		public long intervalTime;
 		public long totalTime;
 
@@ -73,12 +87,12 @@ public class FramesocReader {
 
 		@Override
 		public String toString() {
-			return size + ", " + index + ", " + param + ", " + interval + ", " + intervalTime
-					+ ", " + totalTime;
+			return size + "," + index + "," + param + "," + interval + "," + intervalTime
+					+ "," + totalTime;
 		}
 
 		public static String getHeader() {
-			return "size, index, param, interval, interval_time, total_time";
+			return "size,index,param,interval,interval_time,total_time";
 		}
 	}
 
@@ -100,16 +114,19 @@ public class FramesocReader {
 			return;
 		}
 
+		loadTraces();
+
 		FramesocReaderConfig config = new FramesocReaderConfig();
 		config.setConfigFile(configFile);
 		List<ConfigLine> lines = config.getConfigLines();
 		Boolean params[] = config.getParams();
-		Long intervals[] = config.getIntervals();
+		Integer intervals[] = config.getIntervals();
 
 		System.out.println(ReaderOutput.getHeader());
 		for (ConfigLine line : lines) {
 			for (Boolean param : params) {
-				for (Long interval : intervals) {
+				for (Integer interval : intervals) {
+					//System.out.println(line + ", " + param + ", " + interval);
 					try {
 						doExperiment(line, param, interval);
 					} catch (SoCTraceException e) {
@@ -122,7 +139,7 @@ public class FramesocReader {
 
 	}
 
-	private static void doExperiment(ConfigLine line, Boolean param, Long interval)
+	private static void doExperiment(ConfigLine line, Boolean param, int interval)
 			throws SoCTraceException {
 		for (int i = 0; i < line.runs; i++) {
 			ReaderOutput output = null;
@@ -134,7 +151,7 @@ public class FramesocReader {
 			System.out.println(output.toString());
 		}
 	}
-	
+
 	private static ReaderOutput readAll(ConfigLine line, Boolean param) throws SoCTraceException {
 		ReaderOutput output = new ReaderOutput(line);
 		output.param = param;
@@ -147,7 +164,8 @@ public class FramesocReader {
 		EventQuery eq = new EventQuery(traceDB);
 		eq.setLoadParameters(param);
 		List<Event> elist = eq.getList();
-		Assert.isTrue(elist.size() == line.events, "Wrong number of events");
+		Assert.isTrue(elist.size() == line.events, "Wrong number of events: expected "
+				+ line.events + ", obtained " + elist.size());
 		traceDB.close();
 
 		dm.end();
@@ -157,28 +175,100 @@ public class FramesocReader {
 		return output;
 	}
 
-	private static ReaderOutput readInterval(ConfigLine line, Boolean param, Long interval) {
+	private static ReaderOutput readInterval(ConfigLine line, Boolean param, int interval)
+			throws SoCTraceException {
+
+		if (!traces.containsKey(line.dbName)) {
+			throw new SoCTraceException("Trace " + line.dbName + "  not found.");
+		}
+		Trace t = traces.get(line.dbName);
+
 		ReaderOutput output = new ReaderOutput(line);
 		output.param = param;
 		output.interval = interval;
 
 		DeltaManager dm = new DeltaManager();
-		int intervals = 0;
 		dm.start();
-
-		// TODO read
-		// TODO update intervals
-
+		output.intervalTime = readIntervals(t, param, interval, line);
 		dm.end();
 		output.totalTime = dm.getDelta();
-		output.intervalTime = output.totalTime;
-		if (intervals > 0) {
-			output.intervalTime = output.totalTime / intervals;
-		}
 
 		return output;
 	}
 
-	// TODO use heap monitor to measure memory on single executions
-	
+	private static long readIntervals(Trace t, Boolean param, int interval, ConfigLine line)
+			throws SoCTraceException {
+
+		int ev = 0;
+		long start = t.getMinTimestamp();
+		long end = t.getMaxTimestamp();
+
+		// compute interval duration
+		long intervalDuration = LoaderUtils.getIntervalDuration(t, interval);
+
+		// read the time window, interval by interval
+		DeltaManager dm = new DeltaManager();
+		List<Long> intervals = new ArrayList<>();
+		TraceDBObject traceDB = null;
+		try {
+			traceDB = TraceDBObject.openNewIstance(t.getDbName());
+			EventQuery eq = new EventQuery(traceDB);
+			long t0 = start;
+			while (t0 < end) {
+				dm.start();
+				// end interval
+				long t1 = Math.min(end, t0 + intervalDuration);
+				// condition
+				ComparisonOperation endComp = (t1 >= end) ? ComparisonOperation.LE
+						: ComparisonOperation.LT;
+				LogicalCondition and = new LogicalCondition(LogicalOperation.AND);
+				and.addCondition(new SimpleCondition("TIMESTAMP", ComparisonOperation.GE, String
+						.valueOf(t0)));
+				and.addCondition(new SimpleCondition("TIMESTAMP", endComp, String.valueOf(t1)));
+				// query
+				eq.clear();
+				eq.setLoadParameters(param);
+				eq.setElementWhere(and);
+				// get list
+				List<Event> events = eq.getList();
+				ev += events.size();
+				// next interval
+				t0 = t1;
+				dm.end();
+				if (t1 < end) {
+					// not last interval
+					intervals.add(dm.getDelta());
+				}
+				//System.out.println(dm.getDelta());
+			}
+			Assert.isTrue(ev == line.events);
+		} finally {
+			DBObject.finalClose(traceDB);
+		}
+		// compute avg interval (last interval not in the list)
+		long sum = 0;
+		for (Long i : intervals) {
+			sum += i;
+		}
+		if (intervals.size() > 0)
+			return (long) (sum / ((double) intervals.size()));
+		return 0;
+	}
+
+	private static void loadTraces() {
+		ITraceSearch ts = null;
+		try {
+			ts = new TraceSearch().initialize();
+			List<Trace> tList = ts.getTraces();
+			traces = new HashMap<>();
+			for (Trace t : tList) {
+				traces.put(t.getDbName(), t);
+			}
+		} catch (SoCTraceException e) {
+			e.printStackTrace();
+		} finally {
+			TraceSearch.finalUninitialize(ts);
+		}
+	}
+
 }
