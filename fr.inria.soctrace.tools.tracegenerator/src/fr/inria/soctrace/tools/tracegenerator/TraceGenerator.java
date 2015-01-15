@@ -186,6 +186,8 @@ public class TraceGenerator {
 
 	List<EventProducer> producers = new ArrayList<EventProducer>();
 	List<EventProducer> leaves = new ArrayList<EventProducer>();
+	// event category, types
+	List<EventType> typesList = new ArrayList<EventType>();
 	long numberOfGeneratedEvents;
 	long maxTimeStamp;
 
@@ -251,8 +253,7 @@ public class TraceGenerator {
 		IdManager tptIdManager = new IdManager();
 		IdManager producerIdManager = new IdManager();
 
-		// event category, types
-		List<EventType> typesList = new ArrayList<EventType>();
+
 
 		Random rand = new Random();
 
@@ -272,8 +273,7 @@ public class TraceGenerator {
 		
 		// Create non-leave producer
 		for (i = 0; i < numberOfProducers - numberOfLeaves; i++) {
-			createEventProd(root.getId(),
-                    producerIdManager, traceDB);
+			createEventProd(root.getId(), producerIdManager, traceDB);
 		}
 
 		int potentialParentsSize = producers.size();
@@ -290,7 +290,7 @@ public class TraceGenerator {
 
 		monitor.subTask("Generating events");
 		// Create events
-		createEvent(traceDB, typesList, producers, leaves, eIdManager, epIdManager, monitor);
+		createEvent(traceDB, producers, leaves, eIdManager, epIdManager, monitor);
 
 		if (monitor.isCanceled()) {
 			traceDB.dropDatabase();
@@ -375,7 +375,7 @@ public class TraceGenerator {
 		}
 	}
 
-	private void createEvent(TraceDBObject traceDB, List<EventType> typesList,
+	private void createEvent(TraceDBObject traceDB,
 			List<EventProducer> producers, List<EventProducer> leaves,
 			IdManager eIdManager, IdManager epIdManager,
 			IProgressMonitor monitor) throws SoCTraceException {
@@ -396,67 +396,13 @@ public class TraceGenerator {
 		for (EventProducer eProd : eventProducers) {
 			// Reset time at MIN_TIMESTAMP
 			currentTimestamp = MIN_TIMESTAMP;
-			
-			// Create "number of events / number of active producers" events 
+
+			// Create "number of events / number of active producers" events
 			for (i = 0; i < numberOfEvents / eventProducers.size(); i++) {
-				// Randomize event type
-				int type = rand.nextInt(typesList.size());
-				EventType et = typesList.get(type);
-				Event e = null;
 
-				switch (et.getCategory()) {
-				case EventCategory.PUNCTUAL_EVENT:
-					e = new PunctualEvent(eIdManager.getNextId());
-					e.setTimestamp(currentTimestamp);
-					checkMaxTimestamp(currentTimestamp);
-					currentTimestamp++;
-					break;
-				case EventCategory.STATE:
-					State s = new State(eIdManager.getNextId());
-					s.setTimestamp(currentTimestamp);
+				Event e = createAnEvent(i, eProd, eIdManager, rand);
 
-					// Randomize state duration and make sure we don't have a
-					// timestamp over MAX.Long
-					long duration = (Math.abs(rand.nextLong()) / (numberOfEvents + 1l)) + 1l;
-
-					s.setEndTimestamp(currentTimestamp + duration);
-					s.setImbricationLevel(0);
-					currentTimestamp = currentTimestamp + duration;
-					checkMaxTimestamp(currentTimestamp);
-					e = s;
-					break;
-				case EventCategory.LINK:
-					Link l = new Link(eIdManager.getNextId());
-					l.setTimestamp(currentTimestamp);
-					l.setEndTimestamp(currentTimestamp + MAX_DURATION);
-					if (onlyLeaveProducer) {// XXX
-						l.setEndProducer(leaves.get(i % leaves.size()));
-					} else {
-						l.setEndProducer(producers.get(i % producers.size()));
-					}
-					currentTimestamp = currentTimestamp + MAX_DURATION + 1;
-					checkMaxTimestamp(currentTimestamp);
-					e = l;
-					break;
-				case EventCategory.VARIABLE:
-					Variable v = new Variable(eIdManager.getNextId());
-					v.setTimestamp(currentTimestamp);
-					v.setEndTimestamp(0); // XXX
-					checkMaxTimestamp(currentTimestamp);
-					currentTimestamp++; // XXX
-					e = v;
-					break;
-				}
-
-				Assert.isNotNull(e, "Null event: wrong category");
-
-				e.setCategory(et.getCategory());
-				e.setType(et);
-				e.setEventProducer(eProd);
-				e.setCpu(CPU);
-				e.setPage(PAGE);
-
-				for (EventParamType ept : et.getEventParamTypes()) {
+				for (EventParamType ept : e.getType().getEventParamTypes()) {
 					EventParam ep = new EventParam(epIdManager.getNextId());
 					ep.setEvent(e);
 					ep.setEventParamType(ept);
@@ -476,8 +422,98 @@ public class TraceGenerator {
 				}
 			}
 		}
-	}
 
+		// Since we performed a division the exact number of events might not
+		// have been generated so generate new events
+		long additionalEvents = numberOfEvents
+				- (numberOfEvents / eventProducers.size() * eventProducers
+						.size());
+		for (i = 0; i < additionalEvents; i++) {
+			Event e = createAnEvent(i, eventProducers.get(i), eIdManager, rand);
+
+			for (EventParamType ept : e.getType().getEventParamTypes()) {
+				EventParam ep = new EventParam(epIdManager.getNextId());
+				ep.setEvent(e);
+				ep.setEventParamType(ept);
+				ep.setValue(PARAMETER_VALUE);
+				traceDB.save(ep);
+			}
+
+			traceDB.save(e);
+			numberOfGeneratedEvents++;
+			if (numberOfGeneratedEvents % Temictli.NumberOfEventInCommit == 0) {
+				if (monitor.isCanceled()) {
+					return;
+				}
+
+				traceDB.commit();
+				monitor.worked(1);
+			}
+		}
+	}
+	
+	public Event createAnEvent(int cpt, EventProducer eProd,
+			IdManager eIdManager, Random rand) throws SoCTraceException {
+		// Randomize event type
+		int type = rand.nextInt(typesList.size());
+		EventType et = typesList.get(type);
+		Event e = null;
+
+		switch (et.getCategory()) {
+		case EventCategory.PUNCTUAL_EVENT:
+			e = new PunctualEvent(eIdManager.getNextId());
+			e.setTimestamp(currentTimestamp);
+			checkMaxTimestamp(currentTimestamp);
+			currentTimestamp++;
+			break;
+		case EventCategory.STATE:
+			State s = new State(eIdManager.getNextId());
+			s.setTimestamp(currentTimestamp);
+
+			// Randomize state duration and make sure we don't have a
+			// timestamp over MAX.Long
+			long duration = (Math.abs(rand.nextLong()) / (numberOfEvents + 1l)) + 1l;
+
+			s.setEndTimestamp(currentTimestamp + duration);
+			s.setImbricationLevel(0);
+			currentTimestamp = currentTimestamp + duration;
+			checkMaxTimestamp(currentTimestamp);
+			e = s;
+			break;
+		case EventCategory.LINK:
+			Link l = new Link(eIdManager.getNextId());
+			l.setTimestamp(currentTimestamp);
+			l.setEndTimestamp(currentTimestamp + MAX_DURATION);
+			if (onlyLeaveProducer) {// XXX
+				l.setEndProducer(leaves.get(cpt % leaves.size()));
+			} else {
+				l.setEndProducer(producers.get(cpt % producers.size()));
+			}
+			currentTimestamp = currentTimestamp + MAX_DURATION + 1;
+			checkMaxTimestamp(currentTimestamp);
+			e = l;
+			break;
+		case EventCategory.VARIABLE:
+			Variable v = new Variable(eIdManager.getNextId());
+			v.setTimestamp(currentTimestamp);
+			v.setEndTimestamp(0); // XXX
+			checkMaxTimestamp(currentTimestamp);
+			currentTimestamp++; // XXX
+			e = v;
+			break;
+		}
+
+		Assert.isNotNull(e, "Null event: wrong category");
+
+		e.setCategory(et.getCategory());
+		e.setType(et);
+		e.setEventProducer(eProd);
+		e.setCpu(CPU);
+		e.setPage(PAGE);
+
+		return e;
+	}
+	
 	private EventType createTypes(TraceDBObject traceDB, int category, IdManager etIdManager,
 			IdManager eptIdManager) throws SoCTraceException {
 		EventType et = new EventType(etIdManager.getNextId(), category);
