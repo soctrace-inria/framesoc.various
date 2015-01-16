@@ -3,8 +3,14 @@ title: "Framesoc Bench"
 author: "Generoso Pagano"
 date: "01/08/2015"
 output:
-  html_document: default
-  pdf_document: default
+  html_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 4
+  pdf_document:
+    number_sections: yes
+    toc: yes
+    toc_depth: 4
 ---
 
 ```{r, echo=FALSE}
@@ -71,7 +77,7 @@ get_trace <- function(data, s) {
 Framesoc infrastructure benchmark, concerning trace import times and event reading times.
 
 ## Vocabulary
-* Parameter: something influencing the behavior of the system.
+* Parameter: something influencing the behavior of the system.
 * Factor: parameter you decide to variate during experiment.
 * Level: value given to a factor.
 * Metric: what we want to measure
@@ -96,7 +102,6 @@ Hard disk details, obtained with hdparm.
  UDMA modes: udma0 udma1 udma2 udma3 udma4 udma5 *udma6 
  AdvancedPM=no WriteCache=enabled
  Drive conforms to: unknown:  ATA/ATAPI-2,3,4,5,6,7
-
 ```
 
 System details, obtained with custom script.
@@ -298,7 +303,7 @@ dftime[c(1,2,3,4,6)]
 dfinterval[c(1,2,3,4,6)]
 ```
 
-#### Total read time (no interval reading), with and without param, with and without index.
+#### Total read time (no interval reading), with and without param, with and without time index.
 
 ##### Small trace
 
@@ -341,7 +346,7 @@ Got the following `OutOfMemoryError` error:
       	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:53)
       ```
 
-#### Total read time (interval reading, interval=100000), with and without param, with and without index.
+#### Total read time (interval reading, interval=100000), with and without param, with different indexing.
 
 ##### Small trace
 
@@ -426,7 +431,7 @@ Big traces:
 - with param and with interval=20k reading an interval takes only 300 ms, so 5 minutes for the whole trace.
 - this proves that the index on event id (EVENT_PARAM) table is really usefull reading smaller intervals, also for big traces.
 
-#### Total read time and interval time, without param, with and without index (GANTT).
+#### Total read time and interval time, without param, with and without time index (GANTT).
 
 ##### Small trace
 
@@ -475,23 +480,26 @@ ggplot(data=medium_intervalnopar, aes(x=index, y=interval_time, fill=factor(inte
 
 #### Conclusion
 
-- Having parameters (without an index on event_id in the EVENT_PARAM table) kills performance in reading.
+- Having parameters (without an index on EVENT_ID in the EVENT_PARAM table) kills performance in reading.
   This is because, even if we have a temporal index to load events, we still have to search *the whole* EVENT_PARAM
-  table to link the params to the events. For this reason an index on the event_id field of this table could solve
-  the issue. However, the only use-case where parameters are loaded is the table and this kind of visualization is
-  NOT intended to be used for the WHOLE trace, but only on small subsets (after analyzing with the gantt for example).
+  table to link the params to the events. For this reason an index on the event id field of this table could solve
+  the issue. However, the only use-case where parameters are loaded is the TABLE and this kind of visualization is
+  NOT intended to be used for the WHOLE trace, but only on small subsets (after analyzing with the Gantt for example).
   For this reason we don't have by default this index. 
 
 - Actually, even with an index on event id, in the EVENT_PARAM table, the performance with parameters does not change 
   if we keep interval=100k. On the contrary, using a smaller interval (20k) this index become really usefull.
   This is because the query to load the parameters has the form: SELECT * from EVENT_PARAM where EVENT_ID IN (<list of 
   event ids>). If this list is too long, even using the index, we do not have gain. If this list is smaller (20k), we 
-  have huge gains. 
+  have huge gains. Note that, if a small interval (20k) helps a lot when we have both indexes, it kills performance if 
+  we don't have the event id index on EVENT_PARAM table.
+  This behavior may suggest to adapt the interval size, when loading the TABLE, according to the presence of the index
+  on event id in EVENT_PARAM table.
   
 - Having an index on the timestamp makes sense only for interval reading. If we read all, it has no effect on reading.
   As the trace size increases, it becames absolutely necessary. For example: reading the big trace using intervals and
   not loading parameters (GANTT) would take about 16 hours without index and only 4 minutes with the index. 
 
-- Interval (100k) reading ([with index, without parameters] == gantt) increments total time by a factor from 3 to 2 
+- Interval (100k) reading ([with index, without parameters] == GANTT) increments total time by a factor from 3 to 1.5 
   (decreasing as the trace size increase), but we can have a first meaningful feedback in about 250 ms (first 
   interval). Note that for big traces interval reading is compulsory, since we are limited by the memory.
