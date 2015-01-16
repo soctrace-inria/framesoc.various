@@ -210,7 +210,8 @@ since it is the same.
         - false
     + Interval
         - all events, labelled as interval=0 (only small and medium traces)
-        - 100k events, labelled as interval=100000 (chosen as best compromise between speed and UI interactivity)
+        - 100k events, labelled as interval=100000 (chosen as best compromise between speed and UI interactivity for the GANTT)
+        - 20k events, labelled as interval=20000 (chosen as best compromise when loading param with event id index, TABLE). 
 * Metric:
     + Total read time
     + Interval read time
@@ -230,12 +231,14 @@ since it is the same.
 # prepare data summaries
 
 # merge old and new data
+interval20k <- read.csv("../results/reader_smallint.log")
 eindex <- read.csv("../results/reader_eindex.log")
 levels(eindex$index) <- c("both", "time", "none")
 old <- read.csv("../results/reader_second.log")
 levels(old$index) <- c("none", "time")
-# bind two data frames
-all <- rbind(old, eindex)
+
+# bind all data frames
+all <- rbind(old, eindex, interval20k)
 
 # total time summary
 dftime <- summarySE(all, measurevar="total_time", groupvars=c("size", "index", "param", "interval"))
@@ -243,14 +246,19 @@ dftime <- summarySE(all, measurevar="total_time", groupvars=c("size", "index", "
 # interval summary
 dfinterval <- summarySE(all, measurevar="interval_time", groupvars=c("size", "index", "param", "interval"))
 
+# Factors: par, index
 # read all, par, index
 readall <- dftime[dftime$interval=='0',]
 # read interval, par, index
 readint <- dftime[dftime$interval=='100000',]
-intervalreadpar <- dfinterval[dfinterval$param=='true',]
+
+# Factors: interval, index
 # read nopar, interval, index
 readnopar <- dftime[dftime$param=='false',]
 intervalnopar <- dfinterval[dfinterval$param=='false',]
+# read par, interval, index
+readpar <- dftime[dftime$param=='true',]
+intervalreadpar <- dfinterval[dfinterval$param=='true',]
 
 small_readall <- get_trace(readall, 1000000)
 medium_readall <- get_trace(readall, 10000000)
@@ -263,6 +271,10 @@ big_readint <- get_trace(readint, 100000000)
 small_readnopar <- get_trace(readnopar, 1000000)
 medium_readnopar <- get_trace(readnopar, 10000000)
 big_readnopar <- get_trace(readnopar, 100000000)
+
+small_readpar <- get_trace(readpar, 1000000)
+medium_readpar <- get_trace(readpar, 10000000)
+big_readpar <- get_trace(readpar, 100000000)
 
 small_intervalnopar <- get_trace(intervalnopar, 1000000)
 medium_intervalnopar <- get_trace(intervalnopar, 10000000)
@@ -329,7 +341,7 @@ Got the following `OutOfMemoryError` error:
       	at org.eclipse.core.internal.jobs.Worker.run(Worker.java:53)
       ```
 
-#### Total read time (interval reading), with and without param, with and without index.
+#### Total read time (interval reading, interval=100000), with and without param, with and without index.
 
 ##### Small trace
 
@@ -339,14 +351,6 @@ geom_errorbar(aes(ymin=total_time-ci, ymax=total_time+ci), width=.1, position=po
 scale_y_continuous(name="Total time (ms)")  
 ```
 
-Average time to start getting results (get an interval in the interval case)
-
-```{r, echo=FALSE}
-ggplot(data=small_intervalpar, aes(x=index, y=interval_time, fill=factor(interval)))  + 
-         geom_bar(stat="identity", position=position_dodge()) + 
-         geom_errorbar(aes(ymin=interval_time-ci, ymax=interval_time+ci), width=.1, position=position_dodge(.9)) + 
-         scale_y_continuous(name="Total time (ms)")  
-```
 
 ##### Medium trace
 
@@ -356,7 +360,59 @@ geom_errorbar(aes(ymin=total_time-ci, ymax=total_time+ci), width=.1, position=po
 scale_y_continuous(name="Total time (ms)")  
 ```
 
-Average time to start getting results (get an interval in the interval case)
+##### Big trace
+
+- with interval=100000
+    - without time index
+        - with param, reading an interval is about 172 seconds, 47 h for the trace
+        - without param, 61 seconds for an interval, 16 hours for the trace
+
+    - with time index
+        - with param, reading an interval is about 139 seconds, for the whole trace it would take 38 hours (TABLE)
+        - without param, reading an interval is 250 milliseconds, so 4 minutes for the whole trace (GANTT)
+        - NOTE: using param is so long because there is no index on the EVENT_ID of EVENT_PARAM table. See conclusions.    
+        
+    - with both indexes
+        - without param is as above (GANTT)
+        - with param, reading an interval is 133 seconds, so still 37 h for the whole trace (TABLE)
+    
+#### Total read time and interval time, with param, with different indexing (TABLE)
+
+In the titles above, first results means: the average time to start getting results (get an interval in the interval case).
+
+##### Small trace 
+
+Total read time.
+
+```{r, echo=FALSE}
+ggplot(data=small_readpar, aes(x=index, y=total_time, fill=factor(interval)))  + 
+         geom_bar(stat="identity", position=position_dodge()) + 
+         geom_errorbar(aes(ymin=total_time-ci, ymax=total_time+ci), width=.1, position=position_dodge(.9)) + 
+         scale_y_continuous(name="Total time (ms)")  
+```
+ 
+First results.
+
+```{r, echo=FALSE}
+ggplot(data=small_intervalpar, aes(x=index, y=interval_time, fill=factor(interval)))  + 
+         geom_bar(stat="identity", position=position_dodge()) + 
+         geom_errorbar(aes(ymin=interval_time-ci, ymax=interval_time+ci), width=.1, position=position_dodge(.9)) + 
+         scale_y_continuous(name="Total time (ms)")  
+```
+
+##### Medium trace 
+
+Total read time.
+
+```{r, echo=FALSE}
+ggplot(data=medium_readpar, aes(x=index, y=total_time, fill=factor(interval)))  + 
+         geom_bar(stat="identity", position=position_dodge()) + 
+         geom_errorbar(aes(ymin=total_time-ci, ymax=total_time+ci), width=.1, position=position_dodge(.9)) + 
+         scale_y_continuous(name="Total time (ms)")  
+```
+
+ 
+First results.
 
 ```{r, echo=FALSE}
 ggplot(data=medium_intervalpar, aes(x=index, y=interval_time, fill=factor(interval)))  + 
@@ -365,22 +421,11 @@ ggplot(data=medium_intervalpar, aes(x=index, y=interval_time, fill=factor(interv
          scale_y_continuous(name="Total time (ms)")  
 ```
 
-##### Big trace
+Big traces:
+- with param and with interval=100k reading an interval is about 139 seconds, for the whole trace it would take 38 hours (TABLE)
+- with param and with interval=20k reading an interval takes only 300 ms, so 5 minutes for the whole trace.
+- this proves that the index on event id (EVENT_PARAM) table is really usefull reading smaller intervals, also for big traces.
 
-- with interval
-    - without time index
-        - with param, reading an interval is about 172 seconds, 47 h for the trace
-        - without param, 61 seconds for an interval, 16 hours for the trace
-
-    - with time index
-        - with param, reading an interval is about 139 seconds, for the whole trace it would take 38 hours (TABLE)
-        - without param, reading an interval is 250 milliseconds, so 4 minutes for the whole trace (GANTT)
-        - NOTE: using param is SO long because there is no index on the EVENT_ID of EVENT_PARAM table. See conclusions.    
-        
-    - with both indexes
-        - without param is as above (GANTT)
-        - with param, reading an interval is 133 seconds, so still 37 h for the whole trace (TABLE)
-        
 #### Total read time and interval time, without param, with and without index (GANTT).
 
 ##### Small trace
@@ -422,7 +467,7 @@ ggplot(data=medium_intervalnopar, aes(x=index, y=interval_time, fill=factor(inte
 ##### Big trace
 
 - read all (interval==0): no data because of memory limits.
-- with interval
+- with interval=100k
     - with index
         - without param, reading an interval is ~240 milliseconds, so about 4 minutes for the whole trace (GANTT)
     - without index
@@ -437,14 +482,16 @@ ggplot(data=medium_intervalnopar, aes(x=index, y=interval_time, fill=factor(inte
   NOT intended to be used for the WHOLE trace, but only on small subsets (after analyzing with the gantt for example).
   For this reason we don't have by default this index. 
 
-- Actually, even with an index on event id, in the EVENT_PARAM table, the performance with parameters does not change.
-  This is not intuitive. Anyway, given that the import time increases a lot (3x) for big traces, this index on event 
-  id is not currently justifiable.
+- Actually, even with an index on event id, in the EVENT_PARAM table, the performance with parameters does not change 
+  if we keep interval=100k. On the contrary, using a smaller interval (20k) this index become really usefull.
+  This is because the query to load the parameters has the form: SELECT * from EVENT_PARAM where EVENT_ID IN (<list of 
+  event ids>). If this list is too long, even using the index, we do not have gain. If this list is smaller (20k), we 
+  have huge gains. 
   
 - Having an index on the timestamp makes sense only for interval reading. If we read all, it has no effect on reading.
   As the trace size increases, it becames absolutely necessary. For example: reading the big trace using intervals and
   not loading parameters (GANTT) would take about 16 hours without index and only 4 minutes with the index. 
 
-- Interval reading ([with index, without parameters] == gantt) increments total time by a factor from 3 to 2 
+- Interval (100k) reading ([with index, without parameters] == gantt) increments total time by a factor from 3 to 2 
   (decreasing as the trace size increase), but we can have a first meaningful feedback in about 250 ms (first 
   interval). Note that for big traces interval reading is compulsory, since we are limited by the memory.
