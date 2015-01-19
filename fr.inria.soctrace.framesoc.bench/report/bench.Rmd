@@ -305,6 +305,12 @@ dfinterval[c(1,2,3,4,6)]
 
 #### Total read time (no interval reading), with and without param, with and without time index.
 
+In this analysis we see that:
+
+- reading parameters is more than 6x slower
+- when reading all the events, the time index does not change anything (as intuition would say)
+- reading all the events does not scale: for big traces there's not enough memory to perform the query (even with 10 GB reserved for Java Heap).
+
 ##### Small trace
 
 ```{r, echo=FALSE}
@@ -348,6 +354,12 @@ Got the following `OutOfMemoryError` error:
 
 #### Total read time (interval reading, interval=100000), with and without param, with different indexing.
 
+In this analysis we see that:
+
+- when reading intervals, reading parameters kills performance even more.
+- the time index is effective only when we don't read parameters.
+- with an interval of 100000, the EVENT_ID index on EVENT_PARAM table (meaningfull only when reading parameters) is useless.
+
 ##### Small trace
 
 ```{r, echo=FALSE}
@@ -355,7 +367,6 @@ ggplot(data=small_readint, aes(x=index, y=total_time, fill=param)) + geom_bar(st
 geom_errorbar(aes(ymin=total_time-ci, ymax=total_time+ci), width=.1, position=position_dodge(.9)) +
 scale_y_continuous(name="Total time (ms)")  
 ```
-
 
 ##### Medium trace
 
@@ -375,15 +386,25 @@ scale_y_continuous(name="Total time (ms)")
     - with time index
         - with param, reading an interval is about 139 seconds, for the whole trace it would take 38 hours (TABLE)
         - without param, reading an interval is 250 milliseconds, so 4 minutes for the whole trace (GANTT)
-        - NOTE: using param is so long because there is no index on the EVENT_ID of EVENT_PARAM table. See conclusions.    
+        - NOTE: using param is so long because there is no index on the EVENT_ID of EVENT_PARAM table and the interval 
+          used (100000 events) is big. See conclusions.    
         
     - with both indexes
-        - without param is as above (GANTT)
-        - with param, reading an interval is 133 seconds, so still 37 h for the whole trace (TABLE)
+        - with param, reading an interval is 133 seconds, so still 37 h for the whole trace (TABLE). 
+          The index on EVENT_ID is useless when using an interval too big (100000). See conclusions.
+        - without param is as above with time index (GANTT case). 
+        
     
 #### Total read time and interval time, with param, with different indexing (TABLE)
 
 In the titles above, first results means: the average time to start getting results (get an interval in the interval case).
+
+In this analysis we see that:
+
+- using a smaller interval (20k events) enables the benefits of having the both indexes: timestamp index and EVENT_ID index (EVENT_PARAM table).
+- with small interval (20k) and both indexes, the overhead of reading intervals (instead of the whole trace) and parameters is basically removed (actually visible only on small traces). 
+    + For medium traces, for example, with both index we are 14x faster than having the simple time index.
+    + For big traces, we pass from 38 hours to 5 minutes. (~450x faster)
 
 ##### Small trace 
 
@@ -426,12 +447,23 @@ ggplot(data=medium_intervalpar, aes(x=index, y=interval_time, fill=factor(interv
          scale_y_continuous(name="Total time (ms)")  
 ```
 
-Big traces:
-- with param and with interval=100k reading an interval is about 139 seconds, for the whole trace it would take 38 hours (TABLE)
-- with param and with interval=20k reading an interval takes only 300 ms, so 5 minutes for the whole trace.
-- this proves that the index on event id (EVENT_PARAM) table is really usefull reading smaller intervals, also for big traces.
+##### Big traces
+
+- with param and with interval=100k reading an interval is about 139 seconds, for the whole trace it would take 38 hours.
+- with param and with interval=20k, with both indexes reading an interval takes only 300 ms, so 5 minutes for the whole trace.
+    + this proves that the index on event id (EVENT_PARAM table) is really usefull reading smaller intervals, also for big traces.
 
 #### Total read time and interval time, without param, with and without time index (GANTT).
+
+In this analysis we see that:
+
+- Using interval reading, adds some overhead to total time
+    + this is visible only on small traces and without time index
+    + for example, for medium traces, with index, this overhead is about 60%, but, on the other side, we start seeing meaningful information (first interval) after only ~200 ms (instead of waiting the whole loading).
+- Using a time index significantly reduces total read time, when reading intervals.
+    + this is more and more visible as the trace size grows
+    + for example, for big traces we pass from 16 hours to 4 minutes (~240x faster)
+
 
 ##### Small trace
 
