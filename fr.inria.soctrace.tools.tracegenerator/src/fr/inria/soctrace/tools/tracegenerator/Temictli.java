@@ -14,7 +14,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import fr.inria.soctrace.framesoc.core.tools.management.PluginImporterJob;
+import fr.inria.soctrace.framesoc.core.tools.model.FileInput;
 import fr.inria.soctrace.framesoc.core.tools.model.FramesocTool;
+import fr.inria.soctrace.framesoc.core.tools.model.IFramesocToolInput;
 import fr.inria.soctrace.framesoc.core.tools.model.IPluginToolJobBody;
 import fr.inria.soctrace.lib.model.utils.ModelConstants.EventCategory;
 import fr.inria.soctrace.lib.model.utils.SoCTraceException;
@@ -41,21 +43,23 @@ public class Temictli extends FramesocTool {
 	 */
 	private class TemictliPluginJobBody implements IPluginToolJobBody {
 
-		private String args[];
+		private FileInput input;
 
-		public TemictliPluginJobBody(String[] args) {
-			this.args = args;
+		public TemictliPluginJobBody(IFramesocToolInput anInput) {
+			this.input = (FileInput) anInput;
 		}
 
 		@Override
 		public void run(IProgressMonitor monitor) {
+			
+			List<String> files = input.getFiles();
 
 			logger.debug("Arguments: ");
-			for (String s : args) {
+			for (String s : files) {
 				logger.debug(s);
 			}
 
-			if (args.length < 1) {
+			if (files.size() < 1) {
 				logger.error("Too few arguments");
 				return;
 			}
@@ -68,11 +72,11 @@ public class Temictli extends FramesocTool {
 
 			List<String> configFiles = new ArrayList<String>();
 
-			for (int i = 0; i < args.length; ++i) {
-				configFiles.add(args[i]);
-				File t = new File(args[i]);
+			for (String aFile : files) {
+				configFiles.add(aFile);
+				File t = new File(aFile);
 				if (!t.exists()) {
-					logger.error("File " + args[i] + " not found");
+					logger.error("File " + aFile + " not found");
 					return;
 				}
 			}
@@ -183,9 +187,9 @@ public class Temictli extends FramesocTool {
 	}
 
 	@Override
-	public void launch(String[] args) {
+	public void launch(IFramesocToolInput input) {
 		PluginImporterJob job = new PluginImporterJob("Temictli Trace Generator",
-				new TemictliPluginJobBody(args));
+				new TemictliPluginJobBody(input));
 		job.setUser(true);
 		job.schedule();
 	}

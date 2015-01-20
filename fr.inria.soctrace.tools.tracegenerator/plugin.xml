@@ -11,6 +11,7 @@
             Example: Event#State#Variable;20;101;100;true;1000000;true;10
             Note that if indexing is activated in Framesoc, putting the ForceIndexCreation at false won't prevent index creation."
             name="Temictli"
+            id="fr.inria.soctrace.tools.tracegenerator"
             type="IMPORT">
       </tool>
    </extension>
