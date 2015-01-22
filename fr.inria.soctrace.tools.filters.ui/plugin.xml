@@ -5,7 +5,7 @@
    <extension
          point="org.eclipse.ui.views">
       <category
-            name="FrameSoC Filters"
+            name="Framesoc Filters"
             id="fr.inria.soctrace.tools.filters.ui.category.filters">
       </category>
       <view
@@ -21,6 +21,7 @@
       <tool
             class="fr.inria.soctrace.tools.filters.ui.FilterTool"
             doc="No launching arguments needed."
+            id="fr.inria.soctrace.tools.filters.ui"
             name="Filter Tool"
             type="ANALYSIS">
       </tool>
