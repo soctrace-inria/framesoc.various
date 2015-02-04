@@ -5,7 +5,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import fr.inria.soctrace.framesoc.core.tools.management.PluginImporterJob;
+import fr.inria.soctrace.framesoc.core.tools.model.FileInput;
 import fr.inria.soctrace.framesoc.core.tools.model.FramesocTool;
+import fr.inria.soctrace.framesoc.core.tools.model.IFramesocToolInput;
 import fr.inria.soctrace.framesoc.core.tools.model.IPluginToolJobBody;
 import fr.inria.soctrace.lib.model.utils.ModelConstants.EventCategory;
 import fr.inria.soctrace.lib.model.utils.SoCTraceException;
@@ -28,17 +30,17 @@ public class Temictli extends FramesocTool {
 	 */
 	private class TemictliPluginJobBody implements IPluginToolJobBody {
 
-		private String args[];
+		private FileInput args;
 
-		public TemictliPluginJobBody(String[] args) {
-			this.args = args;
+		public TemictliPluginJobBody(IFramesocToolInput input) {
+			this.args = (FileInput) input;
 		}
 
 		@Override
 		public void run(IProgressMonitor monitor) {
 
 			logger.debug("Arguments: ");
-			for (String s : args) {
+			for (String s : args.getFiles()) {
 				logger.debug(s);
 			}
 
@@ -63,15 +65,14 @@ public class Temictli extends FramesocTool {
 	}
 
 	public void generateTraces(IProgressMonitor monitor) {
-		int[] numberOfEvents = new int[] { 1000000, 10000000, 100000000,
-				1000000000, 2000000000, Integer.MAX_VALUE - 1};
-
+		//int[] numberOfEvents = new int[] { 500000000, 1500000000 };
+		int[] numberOfEvents = new int[] { Integer.MAX_VALUE };
 		for (int aNumberOfEvents : numberOfEvents) {
 			TraceGenConfig aConfig = new TraceGenConfig();
 			aConfig.getCategories().add(EventCategory.STATE);
-			aConfig.setNumberOfEventType(10);
-			aConfig.setNumberOfProducers(1111);
-			aConfig.setNumberOfLeaves(1000);
+			aConfig.setNumberOfEventType(100);
+			aConfig.setNumberOfProducers(11111);
+			aConfig.setNumberOfLeaves(10000);
 			aConfig.setOnlyLeavesAsProducer(true);
 			aConfig.setNumberOfEvents(aNumberOfEvents);
 
@@ -104,9 +105,9 @@ public class Temictli extends FramesocTool {
 	}
 
 	@Override
-	public void launch(String[] args) {
+	public void launch(IFramesocToolInput input) {
 		PluginImporterJob job = new PluginImporterJob(
-				"Temictli Trace Generator", new TemictliPluginJobBody(args));
+				"Temictli Trace Generator", new TemictliPluginJobBody(input));
 		job.setUser(true);
 		job.schedule();
 	}

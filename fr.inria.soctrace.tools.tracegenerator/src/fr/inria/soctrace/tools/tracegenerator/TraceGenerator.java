@@ -252,7 +252,7 @@ public class TraceGenerator {
 		coeffMod = new HashMap<EventProducer, Double>();
 		
 		monitor.subTask("Generating event types");
-		int i = 0, j = 0, l =0;
+		int i = 0, j = 0, k = 0, l = 0;
 		
 		// Create event types
 		for (i = 0; i < numberOfEventType; i++) {
@@ -272,13 +272,17 @@ public class TraceGenerator {
 			for (j = 0; j < 10; j++) {
 				EventProducer ep2 = createEventProd(ep1.getId(),
 						producerIdManager, traceDB);
-				for (l = 0; l < 10; l++) {
-					createLeaveEventProd(ep2.getId(), producerIdManager,
-							traceDB);
+				for (k = 0; k < 10; k++) {
+					EventProducer ep3 = createEventProd(ep2.getId(),
+							producerIdManager, traceDB);
+					for (l = 0; l < 10; l++) {
+						createLeaveEventProd(ep3.getId(), producerIdManager,
+								traceDB);
+					}
 				}
 			}
 		}
-		
+
 		traceDB.commit();
 
 		monitor.subTask("Generating events");
@@ -386,7 +390,7 @@ public class TraceGenerator {
 				s.setTimestamp(currentTimestamp);
 
 				// Randomize state duration
-				long duration = (Math.abs(rand.nextLong()) / (numberOfEvents + 1l)) + 1l;
+				long duration = (long) (Math.abs(rand.nextInt(100))) + 1l;
 				
 				s.setEndTimestamp(currentTimestamp + duration);
 				s.setImbricationLevel(0);
