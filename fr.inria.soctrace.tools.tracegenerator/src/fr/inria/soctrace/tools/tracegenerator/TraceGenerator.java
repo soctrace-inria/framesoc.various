@@ -191,6 +191,7 @@ public class TraceGenerator {
 	 */
 	public int numberOfCategories;
 	public long maxStateTime = 1l;
+	public int eventPerLeaf = 0;
 
 	// public String TRACE_TYPE_NAME = TraceGenerator.TYPE_NAME_PREFIX +
 	// TraceGenerator.TRACE_TYPE_ID;
@@ -262,7 +263,9 @@ public class TraceGenerator {
 					eptIdManager);
 			typesList.add(aType);
 		}
-
+		maxStateTime = Long.MAX_VALUE / numberOfEvents;
+		eventPerLeaf = (int) (numberOfEvents / 10 * 10 * 10 * 1000000); 
+		
 		monitor.subTask("Generating event producer");
 		EventProducer root = createEventProd(-1, producerIdManager, traceDB);
 		// Create non-leave producer
@@ -275,10 +278,19 @@ public class TraceGenerator {
 				for (k = 0; k < 10; k++) {
 					EventProducer ep3 = createEventProd(ep2.getId(),
 							producerIdManager, traceDB);
-					for (l = 0; l < 10; l++) {
+					for (l = 0; l < 1000000; l++) {
 						createLeaveEventProd(ep3.getId(), producerIdManager,
 								traceDB);
 					}
+					// Create events
+					createEvent(traceDB, typesList, producers, leaves, eIdManager,
+							epIdManager, monitor);
+					// savecurrent event prod
+					traceDB.commit();
+					// Remove all references to created leaves
+					producers.removeAll(leaves);
+					// Clear the leaves collection
+					leaves.clear();
 				}
 			}
 		}
@@ -286,10 +298,6 @@ public class TraceGenerator {
 		traceDB.commit();
 
 		monitor.subTask("Generating events");
-		maxStateTime = Long.MAX_VALUE / numberOfEvents;
-		// Create events
-		createEvent(traceDB, typesList, producers, leaves, eIdManager,
-				epIdManager, monitor);
 
 		if (monitor.isCanceled()) {
 			traceDB.dropDatabase();
@@ -376,11 +384,11 @@ public class TraceGenerator {
 			IdManager eIdManager, IdManager epIdManager,
 			IProgressMonitor monitor) throws SoCTraceException {
 		int i;
-		 ;
+
 		Random rand = new Random();
 		for (EventProducer eProd : leaves) {
 			currentTimestamp = 0l;
-			for (i = 0; i < numberOfEvents / leaves.size(); i++) {
+			for (i = 0; i < eventPerLeaf; i++) {
 				// Randomize event type
 				int type = rand.nextInt(typesList.size());
 				EventType et = typesList.get(type);
