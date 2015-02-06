@@ -20,6 +20,7 @@
          point="fr.inria.soctrace.framesoc.core.tool">
       <tool
             class="fr.inria.soctrace.tools.filters.ui.FilterTool"
+            id="fr.inria.soctrace.tools.filters.ui"
             doc="No launching arguments needed."
             name="Filter Tool"
             type="ANALYSIS">

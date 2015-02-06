@@ -7,7 +7,7 @@
             class="fr.inria.soctrace.tools.tracegenerator.Temictli"
             doc="Temictli is a trace generator. It will generate a trace from a configuration given as input. The configuration file has the following format. It must be a one-line text file with valuees separated by a &apos;;&apos; and with the values in the following order: typeOfEvent1#typeOfEvent2;NumberOfEventType;NumberOfProducer;NumberOfLeaveProducer; OnlyLeavesProducesEvent(boolean) ; NumberOfEvents. Example: Event#State#Variable;20;101;100;true;1000000"
             name="Temictli"
-            id="fr.inria.soctrace.framesoc.core.tool"
+            id="fr.inria.soctrace.tools.tracegenerator"
             type="IMPORT">
       </tool>
    </extension>

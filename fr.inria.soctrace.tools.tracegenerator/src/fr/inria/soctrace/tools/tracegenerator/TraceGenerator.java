@@ -4,6 +4,7 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Random;
 
@@ -12,7 +13,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import fr.inria.soctrace.lib.model.Event;
-import fr.inria.soctrace.lib.model.EventParam;
 import fr.inria.soctrace.lib.model.EventParamType;
 import fr.inria.soctrace.lib.model.EventProducer;
 import fr.inria.soctrace.lib.model.EventType;
@@ -29,6 +29,7 @@ import fr.inria.soctrace.lib.storage.DBObject.DBMode;
 import fr.inria.soctrace.lib.storage.utils.SQLConstants.FramesocTable;
 import fr.inria.soctrace.lib.storage.SystemDBObject;
 import fr.inria.soctrace.lib.storage.TraceDBObject;
+import fr.inria.soctrace.lib.utils.DeltaManager;
 import fr.inria.soctrace.lib.utils.IdManager;
 
 /**
@@ -183,8 +184,8 @@ public class TraceGenerator {
 	public HashMap<EventProducer, Double> coeffMod;
 
 	
-	List<EventProducer> producers = new ArrayList<EventProducer>();
-	List<EventProducer> leaves = new ArrayList<EventProducer>();
+	List<EventProducer> producers = new LinkedList<EventProducer>();
+	List<EventProducer> leaves = new LinkedList<EventProducer>();
 	
 	/*
 	 * Short-cuts
@@ -192,6 +193,7 @@ public class TraceGenerator {
 	public int numberOfCategories;
 	public long maxStateTime = 1l;
 	public int eventPerLeaf = 0;
+	public int generatedEvent = 0;
 
 	// public String TRACE_TYPE_NAME = TraceGenerator.TYPE_NAME_PREFIX +
 	// TraceGenerator.TRACE_TYPE_ID;
@@ -264,9 +266,12 @@ public class TraceGenerator {
 			typesList.add(aType);
 		}
 		maxStateTime = Long.MAX_VALUE / numberOfEvents;
-		eventPerLeaf = (int) (numberOfEvents / 10 * 10 * 10 * 1000000); 
+		eventPerLeaf = (int) (numberOfEvents / (10 * 10 * 10 * 1000000)); 
 		
+		System.err.println("Gen eventPerLeaf " + eventPerLeaf + ", " + (numberOfEvents));
+
 		monitor.subTask("Generating event producer");
+		DeltaManager aDM = new DeltaManager();
 		EventProducer root = createEventProd(-1, producerIdManager, traceDB);
 		// Create non-leave producer
 		for (i = 0; i < 10; i++) {
@@ -278,19 +283,26 @@ public class TraceGenerator {
 				for (k = 0; k < 10; k++) {
 					EventProducer ep3 = createEventProd(ep2.getId(),
 							producerIdManager, traceDB);
+					aDM.start();
+					DeltaManager toot = new DeltaManager();
+					toot.start();
+					System.err.println("Gen EP " + i + ", " + j + ", " + k);
 					for (l = 0; l < 1000000; l++) {
-						createLeaveEventProd(ep3.getId(), producerIdManager,
+						EventProducer aLeaf = createLeaveEventProd(ep3.getId(), producerIdManager,
 								traceDB);
+						
+						createEvent(traceDB, typesList, producers, leaves, eIdManager,
+								epIdManager, monitor, aLeaf);
+						
+						if (l % 20000 == 0) {
+							if (monitor.isCanceled()) {
+								traceDB.dropDatabase();
+								return;
+							}
+							traceDB.commit();
+						}
 					}
-					// Create events
-					createEvent(traceDB, typesList, producers, leaves, eIdManager,
-							epIdManager, monitor);
-					// savecurrent event prod
 					traceDB.commit();
-					// Remove all references to created leaves
-					producers.removeAll(leaves);
-					// Clear the leaves collection
-					leaves.clear();
 				}
 			}
 		}
@@ -382,13 +394,12 @@ public class TraceGenerator {
 	private void createEvent(TraceDBObject traceDB, List<EventType> typesList,
 			List<EventProducer> producers, List<EventProducer> leaves,
 			IdManager eIdManager, IdManager epIdManager,
-			IProgressMonitor monitor) throws SoCTraceException {
+			IProgressMonitor monitor, EventProducer eProd) throws SoCTraceException {
 		int i;
-
 		Random rand = new Random();
-		for (EventProducer eProd : leaves) {
 			currentTimestamp = 0l;
 			for (i = 0; i < eventPerLeaf; i++) {
+
 				// Randomize event type
 				int type = rand.nextInt(typesList.size());
 				EventType et = typesList.get(type);
@@ -399,10 +410,9 @@ public class TraceGenerator {
 
 				// Randomize state duration
 				long duration = (long) (Math.abs(rand.nextInt(100))) + 1l;
-				
-				s.setEndTimestamp(currentTimestamp + duration);
-				s.setImbricationLevel(0);
 				currentTimestamp = currentTimestamp + duration;
+				s.setEndTimestamp(currentTimestamp);
+				s.setImbricationLevel(0);
 
 				e = s;
 
@@ -412,17 +422,9 @@ public class TraceGenerator {
 				e.setCpu(CPU);
 				e.setPage(PAGE);
 
-				for (EventParamType ept : et.getEventParamTypes()) {
-					EventParam ep = new EventParam(epIdManager.getNextId());
-					ep.setEvent(e);
-					ep.setEventParamType(ept);
-					ep.setValue(PARAMETER_VALUE);
-					traceDB.save(ep);
-				}
-
 				traceDB.save(e);
-
-				if (i % Temictli.NumberOfEventInCommit == 0) {
+				generatedEvent++;
+				if (generatedEvent % Temictli.NumberOfEventInCommit == 0) {
 					if (monitor.isCanceled()) {
 						return;
 					}
@@ -432,9 +434,7 @@ public class TraceGenerator {
 			if (monitor.isCanceled()) {
 				return;
 			}
-			traceDB.commit();
 			monitor.worked(1);
-		}
 	}
 
 	private EventType createTypes(TraceDBObject traceDB, int category,
@@ -485,7 +485,7 @@ public class TraceGenerator {
 		ep.setLocalId(PRODUCER_LOCAL_ID_PREFIX + ep.getId());
 		ep.setParentId(parentId);
 		producers.add(ep);
-		leaves.add(ep);
+		//leaves.add(ep);
 		traceDB.save(ep);
 		
 		return ep;
