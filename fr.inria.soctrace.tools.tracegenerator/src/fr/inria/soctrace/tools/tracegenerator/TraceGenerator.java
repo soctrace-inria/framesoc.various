@@ -484,7 +484,7 @@ public class TraceGenerator {
 		ep.setType(NORMAL_PRODUCER_TYPE);
 		ep.setLocalId(PRODUCER_LOCAL_ID_PREFIX + ep.getId());
 		ep.setParentId(parentId);
-		producers.add(ep);
+		//producers.add(ep);
 		//leaves.add(ep);
 		traceDB.save(ep);
 		
