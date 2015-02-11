@@ -97,17 +97,17 @@ public class FramesocReader {
 	}
 
 	/**
-	 * @param args
-	 *            vector of 1 element, being the configuration file path
+	 * 
+	 * @param files
 	 */
-	public static void main(String[] args) {
+	public static void run(List<String> files) {
 
-		if (args.length < 1) {
+		if (files.size() < 1) {
 			System.err.println("Too few arguments");
 			return;
 		}
 
-		String configFile = args[0];
+		String configFile = files.get(0);
 		File t = new File(configFile);
 		if (!t.exists()) {
 			System.err.println("File " + configFile + " not found");

@@ -358,7 +358,7 @@ In this analysis we see that:
 
 - when reading intervals, reading parameters kills performance even more.
 - the time index is effective only when we don't read parameters.
-- with an interval of 100000, the EVENT_ID index on EVENT_PARAM table (meaningfull only when reading parameters) is useless.
+- with an interval of 100000, the EVENT_ID index on EVENT_PARAM table (meaningful only when reading parameters) is useless.
 
 ##### Small trace
 
@@ -451,7 +451,7 @@ ggplot(data=medium_intervalpar, aes(x=index, y=interval_time, fill=factor(interv
 
 - with param and with interval=100k reading an interval is about 139 seconds, for the whole trace it would take 38 hours.
 - with param and with interval=20k, with both indexes reading an interval takes only 300 ms, so 5 minutes for the whole trace.
-    + this proves that the index on event id (EVENT_PARAM table) is really usefull reading smaller intervals, also for big traces.
+    + this proves that the index on event id (EVENT_PARAM table) is really useful reading smaller intervals, also for big traces.
 
 #### Total read time and interval time, without param, with and without time index (GANTT).
 
@@ -517,10 +517,10 @@ ggplot(data=medium_intervalnopar, aes(x=index, y=interval_time, fill=factor(inte
   table to link the params to the events. For this reason an index on the event id field of this table could solve
   the issue. However, the only use-case where parameters are loaded is the TABLE and this kind of visualization is
   NOT intended to be used for the WHOLE trace, but only on small subsets (after analyzing with the Gantt for example).
-  For this reason we don't have by default this index. 
+  For this reason we don't have by default this index yet. 
 
 - Actually, even with an index on event id, in the EVENT_PARAM table, the performance with parameters does not change 
-  if we keep interval=100k. On the contrary, using a smaller interval (20k) this index become really usefull.
+  if we keep interval=100k. On the contrary, using a smaller interval (20k) this index become really useful.
   This is because the query to load the parameters has the form: SELECT * from EVENT_PARAM where EVENT_ID IN (<list of 
   event ids>). If this list is too long, even using the index, we do not have gain. If this list is smaller (20k), we 
   have huge gains. Note that, if a small interval (20k) helps a lot when we have both indexes, it kills performance if 
@@ -529,7 +529,7 @@ ggplot(data=medium_intervalnopar, aes(x=index, y=interval_time, fill=factor(inte
   on event id in EVENT_PARAM table.
   
 - Having an index on the timestamp makes sense only for interval reading. If we read all, it has no effect on reading.
-  As the trace size increases, it becames absolutely necessary. For example: reading the big trace using intervals and
+  As the trace size increases, it becomes absolutely necessary. For example: reading the big trace using intervals and
   not loading parameters (GANTT) would take about 16 hours without index and only 4 minutes with the index. 
 
 - Interval (100k) reading ([with index, without parameters] == GANTT) increments total time by a factor from 3 to 1.5 

@@ -6,6 +6,7 @@
       <tool
             class="fr.inria.soctrace.framesoc.bench.reading.FramesocReaderTool"
             doc="conf file path"
+            id="fr.inria.soctrace.framesoc.bench.reading.reader"
             name="Framesoc Reader"
             type="IMPORT">
       </tool>
