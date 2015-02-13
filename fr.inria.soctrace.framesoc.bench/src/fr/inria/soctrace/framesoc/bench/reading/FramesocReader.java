@@ -70,6 +70,10 @@ import fr.inria.soctrace.lib.utils.DeltaManager;
  */
 public class FramesocReader {
 
+	// conf variables to print times every NINTERVAL
+	private static final boolean PRINT_INTERVALS = false;
+	private static final int N_INTERVALS = 10;
+
 	private static Map<String, Trace> traces;
 
 	private static final class ReaderOutput {
@@ -87,8 +91,8 @@ public class FramesocReader {
 
 		@Override
 		public String toString() {
-			return size + "," + index + "," + param + "," + interval + "," + intervalTime
-					+ "," + totalTime;
+			return size + "," + index + "," + param + "," + interval + "," + intervalTime + ","
+					+ totalTime;
 		}
 
 		public static String getHeader() {
@@ -126,7 +130,7 @@ public class FramesocReader {
 		for (ConfigLine line : lines) {
 			for (Boolean param : params) {
 				for (Integer interval : intervals) {
-					//System.out.println(line + "," + param + "," + interval);
+					// System.out.println(line + "," + param + "," + interval);
 					try {
 						doExperiment(line, param, interval);
 					} catch (SoCTraceException e) {
@@ -214,6 +218,8 @@ public class FramesocReader {
 			traceDB = TraceDBObject.openNewIstance(t.getDbName());
 			EventQuery eq = new EventQuery(traceDB);
 			long t0 = start;
+			long inter[] = new long[N_INTERVALS];
+			int c = 0;
 			while (t0 < end) {
 				dm.start();
 				// end interval
@@ -239,7 +245,17 @@ public class FramesocReader {
 					// not last interval
 					intervals.add(dm.getDelta());
 				}
-				//System.out.println(dm.getDelta());
+				if (PRINT_INTERVALS) {
+					// print every 10 intervals
+					inter[c] = dm.getDelta();
+					c++;
+					if (c == N_INTERVALS) {
+						c = 0;
+						for (int i = 0; i < N_INTERVALS; i++) {
+							System.out.println(inter[i]);
+						}
+					}
+				}
 			}
 			Assert.isTrue(ev == line.events);
 		} finally {
