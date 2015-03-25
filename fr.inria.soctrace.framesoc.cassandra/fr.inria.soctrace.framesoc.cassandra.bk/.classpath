@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry exported="true" kind="lib" path="lib/cassandra-java-driver-2.1.4/lib/guava-14.0.1.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/cassandra-java-driver-2.1.4/lib/lz4-1.2.0.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/cassandra-java-driver-2.1.4/lib/metrics-core-3.0.2.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/cassandra-java-driver-2.1.4/lib/netty-3.9.0.Final.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/cassandra-java-driver-2.1.4/lib/slf4j-api-1.7.5.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/cassandra-java-driver-2.1.4/lib/snappy-java-1.0.5.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/cassandra-java-driver-2.1.4/cassandra-driver-core-2.1.4.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/cassandra-java-driver-2.1.4/cassandra-driver-dse-2.1.4.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/cassandra-java-driver-2.1.4/cassandra-driver-mapping-2.1.4.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
+	<classpathentry kind="con" path="org.eclipse.pde.core.requiredPlugins"/>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>
