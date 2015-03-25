@@ -6,7 +6,7 @@
 	<classpathentry exported="true" kind="lib" path="lib/cassandra-java-driver-2.1.4/lib/netty-3.9.0.Final.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/cassandra-java-driver-2.1.4/lib/slf4j-api-1.7.5.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/cassandra-java-driver-2.1.4/lib/snappy-java-1.0.5.jar"/>
-	<classpathentry exported="true" kind="lib" path="lib/cassandra-java-driver-2.1.4/cassandra-driver-core-2.1.4.jar"/>
+	<classpathentry exported="true" kind="lib" path="lib/cassandra-java-driver-2.1.4/cassandra-driver-core-2.1.4.jar" sourcepath="/home/generoso/.m2/repository/com/datastax/cassandra/cassandra-driver-core/2.1.4/cassandra-driver-core-2.1.4-sources.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/cassandra-java-driver-2.1.4/cassandra-driver-dse-2.1.4.jar"/>
 	<classpathentry exported="true" kind="lib" path="lib/cassandra-java-driver-2.1.4/cassandra-driver-mapping-2.1.4.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>

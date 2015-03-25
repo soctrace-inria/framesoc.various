@@ -52,6 +52,7 @@ public class CassandraImporterConfig {
 	}
 	
 	public String get(Property var) {
+		System.out.println("P: " + config.getProperty(var.name()));
 		return config.getProperty(var.name());
 	}
 	

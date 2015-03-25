@@ -10,8 +10,11 @@
  ******************************************************************************/
 package fr.inria.soctrace.framesoc.cassandra.loader;
 
+import com.datastax.driver.core.BoundStatement;
 import com.datastax.driver.core.Cluster;
+import com.datastax.driver.core.PreparedStatement;
 import com.datastax.driver.core.ResultSet;
+import com.datastax.driver.core.ResultSetFuture;
 import com.datastax.driver.core.Session;
 
 import fr.inria.soctrace.lib.storage.DBObject.DBMode;
@@ -45,8 +48,11 @@ public class CassandraSession {
 	}
 
 	public ResultSet execute(String query) {
-		System.out.println(query);
 		return session.execute(query);
+	}
+
+	public ResultSetFuture executeAsync(String query) {
+		return session.executeAsync(query);
 	}
 
 	public void close() {
@@ -87,5 +93,13 @@ public class CassandraSession {
 
 	private String initEndTimestampIndex() {
 		return "CREATE INDEX IF NOT EXISTS etidx ON EVENT (LPAR);";
+	}
+
+	public PreparedStatement prepare(String statement) {
+		return session.prepare(statement);
+	}
+
+	public ResultSetFuture executeAsync(BoundStatement statement) {
+		return session.executeAsync(statement);
 	}
 }
