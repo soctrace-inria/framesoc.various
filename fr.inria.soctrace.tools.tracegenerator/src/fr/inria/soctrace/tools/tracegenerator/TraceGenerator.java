@@ -311,7 +311,7 @@ public class TraceGenerator {
 		/*
 		 * Trace metadata
 		 */
-		SystemDBObject sysDB = SystemDBObject.openNewIstance();
+		SystemDBObject sysDB = SystemDBObject.openNewInstance();
 
 		TraceType tt = buildTraceType(sysDB);
 		// tt.setName(TYPE_NAME_PREFIX + tt.getId());

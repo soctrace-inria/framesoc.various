@@ -164,7 +164,7 @@ public class FramesocReader {
 		DeltaManager dm = new DeltaManager();
 		dm.start();
 
-		TraceDBObject traceDB = TraceDBObject.openNewIstance(line.dbName);
+		TraceDBObject traceDB = TraceDBObject.openNewInstance(line.dbName);
 		EventQuery eq = new EventQuery(traceDB);
 		eq.setLoadParameters(param);
 		List<Event> elist = eq.getList();
@@ -215,7 +215,7 @@ public class FramesocReader {
 		List<Long> intervals = new ArrayList<>();
 		TraceDBObject traceDB = null;
 		try {
-			traceDB = TraceDBObject.openNewIstance(t.getDbName());
+			traceDB = TraceDBObject.openNewInstance(t.getDbName());
 			EventQuery eq = new EventQuery(traceDB);
 			long t0 = start;
 			long inter[] = new long[N_INTERVALS];

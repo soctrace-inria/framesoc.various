@@ -88,7 +88,7 @@ public class CassandraImporterTool extends FramesocTool {
 
 					// Trace metadata
 					DeltaManager dm = new DeltaManager();
-					sysDB = SystemDBObject.openNewIstance();
+					sysDB = SystemDBObject.openNewInstance();
 					CassandraTraceMetadata meta = new CassandraTraceMetadata(sysDB, dbName, 0,
 							events * 10, events);
 					Trace t = new Trace(sysDB.getNewId(FramesocTable.TRACE.toString(), "ID"));
