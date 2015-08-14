@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+   <extension
+         point="fr.inria.soctrace.framesoc.core.tool">
+      <tool
+            class="fr.inria.soctrace.tools.varvisu.VariableVisualization"
+            doc="No launching arguments needed."
+            id="fr.inria.soctrace.tools.varvisu.tool"
+            name="Variable Visualization"
+            type="ANALYSIS">
+      </tool>
+   </extension>
+   <extension
+         point="org.eclipse.ui.views">
+      <view
+            class="fr.inria.soctrace.tools.varvisu.VarVisuView"
+            id="fr.inria.soctrace.tools.varvisu.VarVisuView"
+            name="Variable Visualization"
+            restorable="true">
+      </view>
+   </extension>
+
+</plugin>
