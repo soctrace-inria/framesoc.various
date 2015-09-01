@@ -26,6 +26,13 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.Status;
 import org.eclipse.core.runtime.jobs.Job;
+import org.eclipse.draw2d.Figure;
+import org.eclipse.draw2d.Label;
+import org.eclipse.draw2d.LightweightSystem;
+import org.eclipse.draw2d.RectangleFigure;
+import org.eclipse.draw2d.XYLayout;
+import org.eclipse.draw2d.geometry.Point;
+import org.eclipse.draw2d.geometry.Rectangle;
 import org.eclipse.jface.dialogs.MessageDialog;
 import org.eclipse.swt.SWT;
 import org.eclipse.swt.custom.ScrolledComposite;
@@ -33,16 +40,18 @@ import org.eclipse.swt.events.ControlAdapter;
 import org.eclipse.swt.events.ControlEvent;
 import org.eclipse.swt.events.SelectionAdapter;
 import org.eclipse.swt.events.SelectionEvent;
-import org.eclipse.swt.graphics.Cursor;
 import org.eclipse.swt.layout.FillLayout;
 import org.eclipse.swt.layout.GridData;
 import org.eclipse.swt.layout.GridLayout;
 import org.eclipse.swt.widgets.Button;
+import org.eclipse.swt.widgets.Canvas;
 import org.eclipse.swt.widgets.Combo;
 import org.eclipse.swt.widgets.Composite;
 import org.eclipse.swt.widgets.Control;
 import org.eclipse.swt.widgets.Display;
+import org.eclipse.swt.widgets.Event;
 import org.eclipse.swt.widgets.Group;
+import org.eclipse.swt.widgets.Listener;
 import org.eclipse.ui.part.ViewPart;
 import org.eclipse.wb.swt.SWTResourceManager;
 import org.jfree.chart.ChartFactory;
@@ -65,9 +74,11 @@ import fr.inria.soctrace.framesoc.core.FramesocManager;
 import fr.inria.soctrace.framesoc.core.bus.FramesocBusTopic;
 import fr.inria.soctrace.framesoc.core.bus.FramesocBusTopicList;
 import fr.inria.soctrace.framesoc.core.bus.IFramesocBusListener;
+import fr.inria.soctrace.framesoc.ui.colors.FramesocColorManager;
 import fr.inria.soctrace.framesoc.ui.model.TimeInterval;
 import fr.inria.soctrace.lib.model.EventProducer;
 import fr.inria.soctrace.lib.model.EventType;
+import fr.inria.soctrace.lib.model.State;
 import fr.inria.soctrace.lib.model.Trace;
 import fr.inria.soctrace.lib.model.Variable;
 import fr.inria.soctrace.lib.model.utils.ModelConstants.TimeUnit;
@@ -87,17 +98,16 @@ public class VarVisuView extends ViewPart implements IFramesocBusListener {
 	public static final String ID = "fr.inria.soctrace.tools.varvisu.VarVisuView"; //$NON-NLS-1$
 	public static final String PLUGIN_ID = Activator.PLUGIN_ID;
 	
-	private VariableLoader variableLoader;
+	private EventLoader eventLoader;
 	
 	private Composite compositeChart;
 	private ChartComposite chartFrame;
 	private XYDataset dataset;
 	private XYPlot plot;
-	private Trace trace;
+	private Trace trace = null;
 	private List<Trace> traces;
 	final Map<Integer, Trace> traceMap = new HashMap<Integer, Trace>();
 	protected FramesocBusTopicList topics = null;
-	
 	
 	private int numberOfTicks;
 	private Combo comboTraces;
@@ -117,6 +127,8 @@ public class VarVisuView extends ViewPart implements IFramesocBusListener {
 	private static final Color RANGE_GRIDLINE_PAINT = new Color(200, 200, 200);
 	private static final Color MARKER_OUTLINE_PAINT = new Color(0, 0, 255);
 	private static final int TIMESTAMP_MAX_SIZE = 130;
+	private static final double CANVAS_PROPORTION = 0.1;
+	protected static final int STATE_BAR_WIDTH = 15;
 
 	private final Font TICK_LABEL_FONT = new Font("Tahoma", 0, 11);
 	private final Font LABEL_FONT = new Font("Tahoma", 0, 12);
@@ -124,10 +136,13 @@ public class VarVisuView extends ViewPart implements IFramesocBusListener {
 	private final DecimalFormat Y_FORMAT = new DecimalFormat("0");
 	private final XYToolTipGenerator TOOLTIP_GENERATOR = new StandardXYToolTipGenerator(
 			TOOLTIP_FORMAT, X_FORMAT, Y_FORMAT);
+	private Canvas canvas;
+	private Figure root;
+	private Composite compositeGraph;
 
 	public VarVisuView() {
 		try {
-			variableLoader = new VariableLoader();
+			eventLoader = new EventLoader();
 
 			// Register update to synchronize traces
 			topics = new FramesocBusTopicList(this);
@@ -179,35 +194,72 @@ public class VarVisuView extends ViewPart implements IFramesocBusListener {
 		btnLaunchDisplay.setText("Launch Display");
 		btnLaunchDisplay.addSelectionListener(new LaunchDisplayAdapter());
 		
-		// Chart Composite
-		compositeChart = new Composite(parent, SWT.BORDER);
-		compositeChart.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true,
+		compositeGraph = new Composite(parent, SWT.NONE);
+		compositeGraph.setLayout(new GridLayout(1, false));
+		compositeGraph.setLayoutData(new GridData(SWT.FILL, SWT.FILL, true,
 				true, 1, 1));
+		
+		canvas = new Canvas(compositeGraph, SWT.DOUBLE_BUFFERED);
+		canvas.setSize(compositeGraph.getSize().x, (int) (CANVAS_PROPORTION * compositeGraph.getSize().y));
+		canvas.setBackground(SWTResourceManager.getColor(SWT.COLOR_WIDGET_BACKGROUND));
+		GridData gridData = new GridData();
+		gridData.horizontalAlignment = SWT.FILL;
+		gridData.grabExcessHorizontalSpace = true;
+		canvas.setLayoutData(gridData);
+
+		root = new Figure();
+		root.setFont(parent.getFont());
+		final XYLayout layout = new XYLayout();
+		root.setLayoutManager(layout);
+		final LightweightSystem lws = new LightweightSystem(canvas);
+		lws.setContents(root);
+		lws.setControl(canvas);
+		root.setSize(compositeGraph.getSize().x, (int) (CANVAS_PROPORTION * compositeGraph.getSize().y));
+		
+		// Chart Composite
+		compositeChart = new Composite(compositeGraph, SWT.BORDER);
+		compositeChart.setLayoutData(new GridData(SWT.FILL));
+		gridData = new GridData();
+		gridData.horizontalAlignment = SWT.FILL;
+		gridData.grabExcessHorizontalSpace = true;
+		gridData.verticalAlignment = SWT.FILL;
+		gridData.grabExcessVerticalSpace = true;
+		compositeChart.setLayoutData(gridData);
 		FillLayout fl_compositeChart = new FillLayout(SWT.HORIZONTAL);
 		compositeChart.setLayout(fl_compositeChart);
 		compositeChart.addControlListener(new ControlAdapter() {
-
 			@Override
 			public void controlResized(ControlEvent e) {
-				int width = Math.max(compositeChart.getSize().x - 40, 1);
+				int width = Math.max(compositeChart.getSize().x - (groupTraces.getSize().y + canvas.getSize().y), 1);
 				numberOfTicks = Math.max(width / TIMESTAMP_MAX_SIZE, 1);
 			}
 		});
 		
+		compositeGraph.addListener (SWT.Resize,  new Listener () {
+			    public void handleEvent (Event e) {
+			    	if (chartFrame == null)
+						return;
+					buildTimeLine();
+			    }
+			  });
+
 		refresh();
 	}
 
 	private void createDataset(boolean smoothTransition) {
 		dataset = new XYSeriesCollection();
 
-		for (EventProducer ep : variableLoader.getVariables().keySet()) {
-			for (EventType type : variableLoader.getVariables().get(ep)
+		for (EventProducer ep : eventLoader.getVariables().keySet()) {
+			for (EventType type : eventLoader.getVariables().get(ep)
 					.keySet()) {
+				// Create a new curve per event producer
 				XYSeries series = new XYSeries(ep.getName() + "_" + type.getName());
-				for (Variable variable : variableLoader.getVariables().get(ep)
+				for (Variable variable : eventLoader.getVariables().get(ep)
 						.get(type)) {
 					series.add(variable.getTimestamp(), variable.getValue());
-					if(!smoothTransition)
+					
+					if (!smoothTransition)
+						// Add the same value at the end of time stamp
 						series.add(variable.getEndTimestamp(), variable.getValue());
 				}
 				((XYSeriesCollection) dataset).addSeries(series);
@@ -230,22 +282,21 @@ public class VarVisuView extends ViewPart implements IFramesocBusListener {
 				// Clean parent
 				clearGraph();
 
-				// histogram chart
+				// curve chart
 				chartFrame = new ChartComposite(compositeChart, SWT.NONE,
 						chart, true);
 
 				// size
 				chartFrame.setSize(compositeChart.getSize());
 				// prevent y zooming
-				chartFrame.setRangeZoomable(false);
+				chartFrame.setRangeZoomable(false); 
 				// prevent x zooming (we do it manually with wheel)
 				chartFrame.setDomainZoomable(false);
-				plot = chart.getXYPlot();
+				plot = chart.getXYPlot(); 
 				// workaround for last xaxis tick not shown (jfreechart bug)
 				RectangleInsets insets = plot.getInsets();
 				plot.setInsets(new RectangleInsets(insets.getTop(), insets
-						.getLeft(), insets.getBottom(), 25));
-				// time bounds
+						.getLeft(), insets.getBottom(), 25)); // time bounds
 				plot.getDomainAxis().setLowerBound(displayed.startTimestamp);
 				plot.getDomainAxis().setUpperBound(displayed.endTimestamp);
 			}
@@ -253,11 +304,15 @@ public class VarVisuView extends ViewPart implements IFramesocBusListener {
 	}
 	 
 	private void clearGraph() {
+		if (root != null && canvas != null) {
+			root.removeAll();
+			canvas.redraw();
+		}
 		for (Control c : compositeChart.getChildren()) {
 			c.dispose();
 		}
 	}
-	
+
 	@Override
 	public void dispose() {
 		if (topics != null)
@@ -326,6 +381,39 @@ public class VarVisuView extends ViewPart implements IFramesocBusListener {
 		yaxis.setTickLabelFont(TICK_LABEL_FONT);
 		yaxis.setLabelFont(LABEL_FONT);
 	}
+	
+	private void buildTimeLine() {
+		if(root == null || trace == null || chartFrame == null)
+			return;
+		root.removeAll();
+		
+		double totalWidth = chartFrame.getScreenDataArea().width;
+		int startOffset = chartFrame.getScreenDataArea().x; 
+		long totalTime = trace.getMaxTimestamp() - trace.getMinTimestamp();
+		double timePerPixel = totalTime / totalWidth;
+		
+		for(EventProducer ep: eventLoader.getStates().keySet()) {
+			for(EventType type: eventLoader.getStates().get(ep).keySet()){
+				for(State state: eventLoader.getStates().get(ep).get(type)){
+					RectangleFigure rectangle = new RectangleFigure();
+					rectangle.setBackgroundColor(FramesocColorManager.getInstance()
+							.getEventTypeColor(type.getName()).getSwtColor());
+					rectangle.setForegroundColor(FramesocColorManager.getInstance()
+							.getEventTypeColor(type.getName()).getSwtColor());
+					rectangle.setToolTip(new Label(" " + state.getType().getName() + " "));
+					int x0 = (int) ((state.getTimestamp() - trace.getMinTimestamp()) / timePerPixel);
+					int x1 = (int) ((state.getEndTimestamp() - trace.getMinTimestamp()) / timePerPixel);
+					x0 += startOffset;
+					x1 += startOffset;
+					
+					root.add(rectangle, 
+							new Rectangle(new Point(x0, 0), new Point(x1,
+									root.getClientArea().height())));
+				}
+			}
+		}
+		root.validate();
+	}
 
 	@Override
 	public void setFocus() {
@@ -352,11 +440,10 @@ public class VarVisuView extends ViewPart implements IFramesocBusListener {
 	}
 		
 	private class TraceAdapter extends SelectionAdapter {
-
 		@Override
 		public void widgetSelected(final SelectionEvent e) {
 			trace = traceMap.get(comboTraces.getSelectionIndex());
-			variableLoader.clean();
+			eventLoader.clean();
 			clearGraph();
 		}
 	}
@@ -387,54 +474,55 @@ public class VarVisuView extends ViewPart implements IFramesocBusListener {
 		public void widgetSelected(final SelectionEvent e) {
 
 			final String title = "Displaying curves";
+
 			final Job job = new Job(title) {
 
 				@Override
 				protected IStatus run(final IProgressMonitor monitor) {
 					monitor.beginTask(title, 3);
 
-					try {
-						variableLoader.getVariable(trace, monitor);
-					} catch (final SoCTraceException e) {
-						Display.getDefault().syncExec(new Runnable() {
-							@Override
-							public void run() {
-								MessageDialog.openInformation(
-										getSite().getShell(),
-										"Error",
-										"Error while querying variables: "
-												+ e.getMessage());
-							}
-						});
+					if (trace == null) {
+						displayError("No trace selected.", "Error");
 						return Status.CANCEL_STATUS;
 					}
-					
-					// if return empty list
-					if (variableLoader.getVariables().isEmpty()) {
-						Display.getDefault().syncExec(new Runnable() {
-							@Override
-							public void run() {
-								MessageDialog.openInformation(getSite()
-										.getShell(), "No variables",
-										"No variable detected in this trace.");
-							}
-						});
+
+					try {
+						eventLoader.queryVariable(trace, monitor);
+					} catch (final SoCTraceException e) {
+						displayError(
+								"Error while querying variables: "
+										+ e.getMessage(), "Error");
+						return Status.CANCEL_STATUS;
+					}
+
+					// If returned empty list
+					if (eventLoader.getVariables().isEmpty()) {
+						displayError("No variable detected in this trace.",
+								"No variable");
 						return Status.CANCEL_STATUS;
 					}
 				
 					monitor.subTask("Building chart.");
-					
+
 					// Build dataset
 					createDataset(true);
-					
+
 					// Display chart
 					JFreeChart chart = createChart();
-					//chart.getXYPlot().setRenderer(new XYSplineRenderer());
-					
-					TimeInterval displayed = new TimeInterval(trace.getMinTimestamp(), trace.getMaxTimestamp());
-					
-					preparePlot(false, chart, displayed) ;
+
+					TimeInterval displayed = new TimeInterval(
+							trace.getMinTimestamp(), trace.getMaxTimestamp());
+
+					preparePlot(false, chart, displayed);
 					displayChart(chart, displayed);
+					
+					Display.getDefault().syncExec(new Runnable() {
+						@Override
+						public void run() {
+							buildTimeLine();
+						}
+					});
+
 					monitor.worked(1);
 					monitor.done();
 					
@@ -443,9 +531,20 @@ public class VarVisuView extends ViewPart implements IFramesocBusListener {
 			};
 			job.setUser(true);
 			job.schedule();
+
+		}
+		
+		private void displayError(final String errorMessage, final String title) {
+			Display.getDefault().syncExec(new Runnable() {
+				@Override
+				public void run() {
+					MessageDialog.openInformation(getSite().getShell(), title,
+							errorMessage);
+				}
+			});
 		}
 	}
-
+	
 	@Override
 	public void handle(FramesocBusTopic topic, Object data) {
 		if (topic.equals(FramesocBusTopic.TOPIC_UI_TRACES_SYNCHRONIZED)

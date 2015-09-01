@@ -20,6 +20,7 @@ import org.eclipse.core.runtime.IProgressMonitor;
 import fr.inria.soctrace.lib.model.Event;
 import fr.inria.soctrace.lib.model.EventProducer;
 import fr.inria.soctrace.lib.model.EventType;
+import fr.inria.soctrace.lib.model.State;
 import fr.inria.soctrace.lib.model.Trace;
 import fr.inria.soctrace.lib.model.Variable;
 import fr.inria.soctrace.lib.model.utils.ModelConstants.EventCategory;
@@ -35,12 +36,13 @@ import fr.inria.soctrace.lib.storage.TraceDBObject;
  * 
  * @author "Youenn Corre <youenn.corre@inria.fr>"
  */
-public class VariableLoader {
+public class EventLoader {
 
 	private static final String CATEGORY = "CATEGORY";
 	private Map<EventProducer, Map<EventType, List<Variable>>> variables;
-
-	public VariableLoader() {
+	private Map<EventProducer, Map<EventType, List<State>>> states;
+	
+	public EventLoader() {
 		clean();
 	}
 
@@ -53,7 +55,7 @@ public class VariableLoader {
 	 *            progress monitor
 	 * @throws SoCTraceException
 	 */
-	public void getVariable(Trace aTrace, IProgressMonitor monitor)
+	public void queryVariable(Trace aTrace, IProgressMonitor monitor)
 			throws SoCTraceException {
 		TraceDBObject traceDB;
 		monitor.subTask("Querying variables.");
@@ -69,20 +71,44 @@ public class VariableLoader {
 		List<Event> var = eventQuery.getList();
 		monitor.worked(1);
 
+		EventQuery eventQueryState = new EventQuery(traceDB);
+		SimpleCondition selectState = new SimpleCondition(CATEGORY,
+				ComparisonOperation.EQ, String.valueOf(EventCategory.STATE));
+		eventQueryState.setElementWhere(selectState);
+
+		List<Event> state = eventQueryState.getList();
+		
 		// Process the variable
 		monitor.subTask("Processing variables.");
 		clean();
-		processEvents(var);
+		processVariables(var);
+		processStates(state);
 		monitor.worked(1);
 	}
 
 	/**
 	 * Store the variables in the hashmap
 	 * 
-	 * @param vars
-	 *            List of variables to process
+	 * @param processedStates
+	 *            List of states to process
 	 */
-	private void processEvents(List<Event> vars) {
+	private void processStates(List<Event> processedStates) {
+		for (Event event : processedStates) {
+			EventProducer ep = event.getEventProducer();
+			if (!states.containsKey(ep)) {
+				states.put(ep, new HashMap<EventType, List<State>>());
+			}
+
+			EventType type = event.getType();
+			if (!states.get(ep).containsKey(type)) {
+				states.get(ep).put(type, new ArrayList<State>());
+			}
+
+			states.get(ep).get(type).add((State) event);
+		}
+	}
+	
+	private void processVariables(List<Event> vars) {
 		for (Event event : vars) {
 			EventProducer ep = event.getEventProducer();
 			if (!variables.containsKey(ep)) {
@@ -103,6 +129,7 @@ public class VariableLoader {
 	 */
 	public void clean() {
 		variables = new HashMap<EventProducer, Map<EventType, List<Variable>>>();
+		states = new HashMap<EventProducer, Map<EventType, List<State>>>();
 	}
 
 	/**
@@ -112,6 +139,15 @@ public class VariableLoader {
 	 */
 	public Map<EventProducer, Map<EventType, List<Variable>>> getVariables() {
 		return variables;
+	}
+	
+	/**
+	 * Getter for the hashmap of states
+	 * 
+	 * @return the hashmap of states
+	 */
+	public Map<EventProducer, Map<EventType, List<State>>> getStates() {
+		return states;
 	}
 
 }
